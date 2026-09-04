@@ -10,7 +10,7 @@ type Exposure = {
   notes: string | null;
   foods: {
     name: string;
-  } | null;
+  }[] | null;
 };
 
 export default function HistoryPage() {
@@ -22,7 +22,14 @@ export default function HistoryPage() {
     async function loadHistory() {
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        setMessage(sessionError.message);
+        setLoading(false);
+        return;
+      }
 
       if (!session) {
         window.location.href = "/";
@@ -44,10 +51,11 @@ export default function HistoryPage() {
 
       if (error) {
         setMessage(error.message);
-      } else {
-        setExposures((data as Exposure[]) ?? []);
+        setLoading(false);
+        return;
       }
 
+      setExposures((data ?? []) as Exposure[]);
       setLoading(false);
     }
 
@@ -71,7 +79,12 @@ export default function HistoryPage() {
 
   if (loading) {
     return (
-      <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
+      <main
+        style={{
+          padding: "40px",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
         Loading...
       </main>
     );
@@ -88,12 +101,25 @@ export default function HistoryPage() {
     >
       <h1>Thea&apos;s Food History</h1>
 
-      <p>Everything Thea has tried, with her preferences and notes.</p>
+      <p>
+        Everything Thea has tried, with her preferences and notes.
+      </p>
 
-      {message && <p>{message}</p>}
+      {message && (
+        <p
+          style={{
+            marginTop: "20px",
+            fontWeight: "bold",
+          }}
+        >
+          {message}
+        </p>
+      )}
 
       {exposures.length === 0 ? (
-        <p>No foods logged yet.</p>
+        <p style={{ marginTop: "30px" }}>
+          No foods logged yet.
+        </p>
       ) : (
         exposures.map((exposure) => (
           <section
@@ -106,7 +132,7 @@ export default function HistoryPage() {
             }}
           >
             <h2 style={{ marginTop: 0 }}>
-              {exposure.foods?.name ?? "Unknown food"}
+              {exposure.foods?.[0]?.name ?? "Unknown food"}
             </h2>
 
             <p>

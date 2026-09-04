@@ -31,7 +31,6 @@ export default function Home() {
   function getStartOfWeek() {
     const today = new Date();
     const day = today.getDay();
-
     const daysSinceMonday = day === 0 ? 6 : day - 1;
 
     const monday = new Date(today);
@@ -92,9 +91,7 @@ export default function Home() {
       .single();
 
     if (babyError || !baby) {
-      setMessage(
-        babyError?.message ?? "Could not find Thea's baby record."
-      );
+      setMessage(babyError?.message ?? "Could not find Thea's baby record.");
       return;
     }
 
@@ -238,136 +235,105 @@ export default function Home() {
 
   if (loading) {
     return (
-      <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
-        Loading...
+      <main className="app-shell">
+        <p>Loading...</p>
       </main>
     );
   }
 
   if (!signedIn) {
     return (
-      <main
-        style={{
-          maxWidth: "420px",
-          margin: "80px auto",
-          padding: "24px",
-          fontFamily: "Arial, sans-serif",
-        }}
-      >
-        <h1>Thea&apos;s Food Tracker</h1>
+      <main className="app-shell" style={{ maxWidth: "460px" }}>
+        <h1 className="page-title">Thea&apos;s Food Tracker</h1>
 
-        <p>Sign in to track Thea&apos;s food journey.</p>
+        <p className="page-subtitle">
+          Sign in to track Thea&apos;s food journey.
+        </p>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            display: "block",
-            width: "100%",
-            padding: "12px",
-            marginTop: "20px",
-            marginBottom: "12px",
-            boxSizing: "border-box",
-          }}
-        />
+        <section className="card">
+          <label className="label">
+            Email
+            <input
+              className="field"
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{ marginTop: "8px", marginBottom: "16px" }}
+            />
+          </label>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{
-            display: "block",
-            width: "100%",
-            padding: "12px",
-            marginBottom: "12px",
-            boxSizing: "border-box",
-          }}
-        />
+          <label className="label">
+            Password
+            <input
+              className="field"
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ marginTop: "8px", marginBottom: "18px" }}
+            />
+          </label>
 
-        <button onClick={signIn} disabled={signingIn}>
-          {signingIn ? "Signing in..." : "Sign in"}
-        </button>
+          <button
+            className="primary-button"
+            onClick={signIn}
+            disabled={signingIn}
+          >
+            {signingIn ? "Signing in..." : "Sign in"}
+          </button>
 
-        {message && <p>{message}</p>}
+          {message && <p className="message">{message}</p>}
+        </section>
       </main>
     );
   }
 
   return (
-    <main
-      style={{
-        maxWidth: "500px",
-        margin: "40px auto",
-        padding: "24px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1>{babyName || "Thea"}&apos;s Food Tracker</h1>
+    <main className="app-shell">
+      <h1 className="page-title">
+        {babyName || "Thea"}&apos;s Food Tracker
+      </h1>
 
-      <nav
-        style={{
-          display: "flex",
-          gap: "16px",
-          flexWrap: "wrap",
-          marginTop: "16px",
-          marginBottom: "24px",
-        }}
-      >
-        <a href="/" style={{ fontWeight: "bold" }}>
+      <p className="page-subtitle">
+        A simple place to track foods, preferences, plants, and allergens.
+      </p>
+
+      <nav className="nav-card">
+        <a href="/" className="nav-link active">
           🏠 Home
         </a>
 
-        <a href="/history">
+        <a href="/history" className="nav-link">
           📖 History
         </a>
 
-        <a href="/allergens">
+        <a href="/allergens" className="nav-link">
           🥜 Allergens
         </a>
       </nav>
 
-      <section
-        style={{
-          border: "1px solid #ddd",
-          borderRadius: "16px",
-          padding: "24px",
-          marginTop: "30px",
-        }}
-      >
-        <h2>🌱 This Week</h2>
+      <section className="card green">
+        <h2 className="section-title">🌱 This Week</h2>
 
-        <p style={{ fontSize: "32px", fontWeight: "bold" }}>
+        <p className="big-number">
           {plantCount} / {plantGoal ?? 25}
         </p>
 
-        <p>different plant types</p>
+        <p className="muted" style={{ marginBottom: 0 }}>
+          different plant types
+        </p>
       </section>
 
-      <section
-        style={{
-          border: "1px solid #ddd",
-          borderRadius: "16px",
-          padding: "24px",
-          marginTop: "16px",
-        }}
-      >
-        <h2>🍓 Log Food</h2>
+      <section className="card">
+        <h2 className="section-title">🍓 Log Food</h2>
 
-        <label>
+        <label className="label">
           Food
           <select
+            className="select-field"
             value={selectedFoodId}
             onChange={(e) => setSelectedFoodId(e.target.value)}
-            style={{
-              display: "block",
-              width: "100%",
-              padding: "12px",
-              marginTop: "8px",
-              marginBottom: "16px",
-            }}
           >
             <option value="">Choose a food</option>
 
@@ -379,18 +345,12 @@ export default function Home() {
           </select>
         </label>
 
-        <label>
+        <label className="label">
           Preference
           <select
+            className="select-field"
             value={preference}
             onChange={(e) => setPreference(e.target.value)}
-            style={{
-              display: "block",
-              width: "100%",
-              padding: "12px",
-              marginTop: "8px",
-              marginBottom: "16px",
-            }}
           >
             <option value="">Not recorded</option>
             <option value="loved">Loved ❤️</option>
@@ -400,56 +360,40 @@ export default function Home() {
           </select>
         </label>
 
-        <label>
+        <label className="label">
           Notes
           <textarea
+            className="textarea-field"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Optional notes"
-            style={{
-              display: "block",
-              width: "100%",
-              padding: "12px",
-              marginTop: "8px",
-              marginBottom: "16px",
-              boxSizing: "border-box",
-            }}
           />
         </label>
 
-        <button onClick={saveFoodExposure} disabled={savingFood}>
+        <button
+          className="primary-button"
+          onClick={saveFoodExposure}
+          disabled={savingFood}
+        >
           {savingFood ? "Saving..." : "Save food"}
         </button>
 
-        {message && (
-          <p style={{ marginTop: "12px", fontWeight: "bold" }}>
-            {message}
-          </p>
-        )}
+        {message && <p className="message">{message}</p>}
       </section>
 
-      <section
-        style={{
-          border: "1px solid #ddd",
-          borderRadius: "16px",
-          padding: "24px",
-          marginTop: "16px",
-        }}
-      >
-        <h2>💡 Meal Ideas</h2>
-        <p>
+      <section className="card soft">
+        <h2 className="section-title">💡 Meal Ideas</h2>
+
+        <p className="muted" style={{ marginBottom: 0 }}>
           At least one safe food, no more than one new food, with repeat
           exposure encouraged.
         </p>
       </section>
 
       <button
+        className="secondary-button"
         onClick={signOut}
-        style={{
-          marginTop: "30px",
-          padding: "10px 16px",
-          cursor: "pointer",
-        }}
+        style={{ marginTop: "24px" }}
       >
         Sign out
       </button>

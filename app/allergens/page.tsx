@@ -229,7 +229,21 @@ export default function AllergensPage() {
 
       {allergens.map((allergen) => {
         const introduced = allergen.exposureCount > 0;
+function allergenEmoji(name: string) {
+  const emojis: Record<string, string> = {
+    Milk: "🥛",
+    Egg: "🥚",
+    Peanut: "🥜",
+    "Tree Nuts": "🌰",
+    Wheat: "🌾",
+    Soy: "🫘",
+    Sesame: "🌱",
+    Fish: "🐟",
+    "Crustacean Shellfish": "🦐",
+  };
 
+  return emojis[name] ?? "🍽️";
+}
         return (
           <section
             key={allergen.id}

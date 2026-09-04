@@ -15,6 +15,7 @@ export default function Home() {
   const [babyId, setBabyId] = useState("");
   const [babyName, setBabyName] = useState("");
   const [plantGoal, setPlantGoal] = useState<number | null>(null);
+  const [plantCount, setPlantCount] = useState(0);
 
   const [foods, setFoods] = useState<Food[]>([]);
   const [selectedFoodId, setSelectedFoodId] = useState("");
@@ -26,6 +27,63 @@ export default function Home() {
   const [savingFood, setSavingFood] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [message, setMessage] = useState("");
+
+  function getStartOfWeek() {
+    const today = new Date();
+    const day = today.getDay();
+
+    // Monday = start of the week
+    const daysSinceMonday = day === 0 ? 6 : day - 1;
+
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - daysSinceMonday);
+
+    return [
+      monday.getFullYear(),
+      String(monday.getMonth() + 1).padStart(2, "0"),
+      String(monday.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
+  async function loadPlantCount(currentBabyId: string) {
+    const startOfWeek = getStartOfWeek();
+
+    const { data: exposures, error: exposureError } = await supabase
+      .from("food_exposures")
+      .select("food_id")
+      .eq("baby_id", currentBabyId)
+      .gte("eaten_at", startOfWeek);
+
+    if (exposureError) {
+      setMessage(exposureError.message);
+      return;
+    }
+
+    const foodIds = [
+      ...new Set((exposures ?? []).map((exposure) => exposure.food_id)),
+    ];
+
+    if (foodIds.length === 0) {
+      setPlantCount(0);
+      return;
+    }
+
+    const { data: mappings, error: mappingError } = await supabase
+      .from("food_plant_types")
+      .select("plant_type_id")
+      .in("food_id", foodIds);
+
+    if (mappingError) {
+      setMessage(mappingError.message);
+      return;
+    }
+
+    const uniquePlants = new Set(
+      (mappings ?? []).map((mapping) => mapping.plant_type_id)
+    );
+
+    setPlantCount(uniquePlants.size);
+  }
 
   async function loadBabyData() {
     const { data: baby, error: babyError } = await supabase
@@ -56,6 +114,8 @@ export default function Home() {
     }
 
     setPlantGoal(settings.weekly_plant_goal);
+
+    await loadPlantCount(baby.id);
   }
 
   async function loadFoods() {
@@ -115,7 +175,6 @@ export default function Home() {
     setSignedIn(true);
     await loadBabyData();
     await loadFoods();
-
     setSigningIn(false);
   }
 
@@ -154,10 +213,13 @@ export default function Home() {
       return;
     }
 
-    setMessage("Food saved!");
     setSelectedFoodId("");
     setPreference("");
     setNotes("");
+
+    await loadPlantCount(babyId);
+
+    setMessage("Food saved! ✓");
     setSavingFood(false);
   }
 
@@ -168,6 +230,7 @@ export default function Home() {
     setBabyId("");
     setBabyName("");
     setPlantGoal(null);
+    setPlantCount(0);
     setFoods([]);
     setEmail("");
     setPassword("");
@@ -194,9 +257,7 @@ export default function Home() {
       >
         <h1>Thea&apos;s Food Tracker</h1>
 
-        <p>
-          Sign in to track Thea&apos;s foods, plants, allergens, and favorites.
-        </p>
+        <p>Sign in to track Thea&apos;s food journey.</p>
 
         <input
           type="email"
@@ -227,18 +288,11 @@ export default function Home() {
           }}
         />
 
-        <button
-          onClick={signIn}
-          disabled={signingIn}
-          style={{
-            padding: "12px 18px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={signIn} disabled={signingIn}>
           {signingIn ? "Signing in..." : "Sign in"}
         </button>
 
-        {message && <p style={{ marginTop: "16px" }}>{message}</p>}
+        {message && <p>{message}</p>}
       </main>
     );
   }
@@ -265,7 +319,7 @@ export default function Home() {
         <h2>🌱 This Week</h2>
 
         <p style={{ fontSize: "32px", fontWeight: "bold" }}>
-          0 / {plantGoal ?? 25}
+          {plantCount} / {plantGoal ?? 25}
         </p>
 
         <p>different plant types</p>
@@ -342,16 +396,15 @@ export default function Home() {
           />
         </label>
 
-        <button
-          onClick={saveFoodExposure}
-          disabled={savingFood}
-          style={{
-            padding: "12px 18px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={saveFoodExposure} disabled={savingFood}>
           {savingFood ? "Saving..." : "Save food"}
         </button>
+
+        {message && (
+          <p style={{ marginTop: "12px", fontWeight: "bold" }}>
+            {message}
+          </p>
+        )}
       </section>
 
       <section
@@ -364,12 +417,10 @@ export default function Home() {
       >
         <h2>💡 Meal Ideas</h2>
         <p>
-          Meals will include at least one safe food, no more than one new food,
-          and can include previously disliked foods for repeat exposure.
+          At least one safe food, no more than one new food, with repeat
+          exposure encouraged.
         </p>
       </section>
-
-      {message && <p style={{ marginTop: "16px" }}>{message}</p>}
 
       <button
         onClick={signOut}

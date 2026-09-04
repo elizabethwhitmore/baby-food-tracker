@@ -4,154 +4,127 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function Home() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
   const [babyName, setBabyName] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function loadBaby() {
-    const { data, error } = await supabase
-      .from("babies")
-      .select("name")
-      .limit(1)
-      .single();
-
-    if (error) {
-      setMessage(`Could not load baby: ${error.message}`);
-      return;
-    }
-
-    setBabyName(data.name);
-  }
-
-  async function signIn() {
-    setLoading(true);
-    setMessage("");
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setMessage(error.message);
-      setLoading(false);
-      return;
-    }
-
-    await loadBaby();
-    setLoading(false);
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut();
-    setBabyName("");
-    setMessage("");
-  }
+  const [plantGoal, setPlantGoal] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function checkSession() {
+    async function loadApp() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (session) {
-        await loadBaby();
+      if (!session) {
+        window.location.reload();
+        return;
       }
+
+      const { data: baby, error: babyError } = await supabase
+        .from("babies")
+        .select("id, name")
+        .limit(1)
+        .single();
+
+      if (babyError || !baby) {
+        setLoading(false);
+        return;
+      }
+
+      setBabyName(baby.name);
+
+      const { data: settings } = await supabase
+        .from("baby_settings")
+        .select("weekly_plant_goal")
+        .eq("baby_id", baby.id)
+        .single();
+
+      if (settings) {
+        setPlantGoal(settings.weekly_plant_goal);
+      }
+
+      setLoading(false);
     }
 
-    checkSession();
+    loadApp();
   }, []);
 
-  if (babyName) {
-    return (
-      <main
-        style={{
-          maxWidth: "420px",
-          margin: "80px auto",
-          padding: "24px",
-          fontFamily: "Arial, sans-serif",
-        }}
-      >
-        <h1>{babyName}&apos;s Food Tracker</h1>
+  async function signOut() {
+    await supabase.auth.signOut();
+    window.location.reload();
+  }
 
-        <p>Welcome! You&apos;re signed in.</p>
-
-        <p>
-          Track {babyName}&apos;s foods, plants, allergens, iron-rich foods,
-          and favorites.
-        </p>
-
-        <button
-          onClick={signOut}
-          style={{
-            padding: "12px 18px",
-            cursor: "pointer",
-          }}
-        >
-          Sign out
-        </button>
-      </main>
-    );
+  if (loading) {
+    return <main style={{ padding: "40px" }}>Loading...</main>;
   }
 
   return (
     <main
       style={{
-        maxWidth: "420px",
-        margin: "80px auto",
+        maxWidth: "500px",
+        margin: "40px auto",
         padding: "24px",
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h1>Thea&apos;s Food Tracker</h1>
+      <h1>{babyName}&apos;s Food Tracker</h1>
 
-      <p>
-        Sign in to track Thea&apos;s foods, plants, allergens, and favorites.
-      </p>
-
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
+      <section
         style={{
-          display: "block",
-          width: "100%",
-          padding: "12px",
-          marginTop: "20px",
-          marginBottom: "12px",
-          boxSizing: "border-box",
+          border: "1px solid #ddd",
+          borderRadius: "16px",
+          padding: "24px",
+          marginTop: "30px",
         }}
-      />
+      >
+        <h2>🌱 This Week</h2>
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        <p style={{ fontSize: "32px", fontWeight: "bold" }}>
+          0 / {plantGoal ?? 25}
+        </p>
+
+        <p>different plant types</p>
+      </section>
+
+      <section
         style={{
-          display: "block",
-          width: "100%",
-          padding: "12px",
-          marginBottom: "12px",
-          boxSizing: "border-box",
+          border: "1px solid #ddd",
+          borderRadius: "16px",
+          padding: "24px",
+          marginTop: "16px",
         }}
-      />
+      >
+        <h2>🍓 Log Food</h2>
+        <p>
+          Soon you&apos;ll be able to tell me what Thea ate in normal
+          language.
+        </p>
+      </section>
+
+      <section
+        style={{
+          border: "1px solid #ddd",
+          borderRadius: "16px",
+          padding: "24px",
+          marginTop: "16px",
+        }}
+      >
+        <h2>💡 Meal Ideas</h2>
+        <p>
+          Meals will include at least one safe food, no more than one new
+          food, and can include previously disliked foods for repeat exposure.
+        </p>
+      </section>
 
       <button
-        onClick={signIn}
-        disabled={loading}
+        onClick={signOut}
         style={{
-          padding: "12px 18px",
+          marginTop: "30px",
+          padding: "10px 16px",
           cursor: "pointer",
         }}
       >
-        {loading ? "Signing in..." : "Sign in"}
+        Sign out
       </button>
-
-      {message && <p style={{ marginTop: "16px" }}>{message}</p>}
     </main>
   );
 }

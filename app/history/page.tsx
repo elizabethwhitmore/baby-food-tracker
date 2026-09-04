@@ -5,12 +5,11 @@ import { supabase } from "../../lib/supabase";
 
 type Exposure = {
   id: string;
+  food_id: string;
+  food_name: string;
   eaten_at: string;
   preference: string | null;
   notes: string | null;
-  foods: {
-    name: string;
-  }[] | null;
 };
 
 export default function HistoryPage() {
@@ -36,26 +35,64 @@ export default function HistoryPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      // First get Thea's food exposure records.
+      const { data: exposureData, error: exposureError } = await supabase
         .from("food_exposures")
         .select(`
           id,
+          food_id,
           eaten_at,
           preference,
-          notes,
-          foods (
-            name
-          )
+          notes
         `)
-        .order("eaten_at", { ascending: false });
+        .order("eaten_at", { ascending: false })
+        .order("created_at", { ascending: false });
 
-      if (error) {
-        setMessage(error.message);
+      if (exposureError) {
+        setMessage(exposureError.message);
         setLoading(false);
         return;
       }
 
-      setExposures((data ?? []) as Exposure[]);
+      if (!exposureData || exposureData.length === 0) {
+        setExposures([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get the unique food IDs from those exposures.
+      const foodIds = [
+        ...new Set(exposureData.map((exposure) => exposure.food_id)),
+      ];
+
+      // Look up the actual food names.
+      const { data: foodData, error: foodError } = await supabase
+        .from("foods")
+        .select("id, name")
+        .in("id", foodIds);
+
+      if (foodError) {
+        setMessage(foodError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Make a quick food ID → food name lookup.
+      const foodNames = new Map(
+        (foodData ?? []).map((food) => [food.id, food.name])
+      );
+
+      // Combine each exposure with its food name.
+      const history: Exposure[] = exposureData.map((exposure) => ({
+        id: exposure.id,
+        food_id: exposure.food_id,
+        food_name: foodNames.get(exposure.food_id) ?? "Unknown food",
+        eaten_at: exposure.eaten_at,
+        preference: exposure.preference,
+        notes: exposure.notes,
+      }));
+
+      setExposures(history);
       setLoading(false);
     }
 
@@ -75,6 +112,18 @@ export default function HistoryPage() {
       default:
         return "Not recorded";
     }
+  }
+
+  function formatDate(dateString: string) {
+    const [year, month, day] = dateString.split("-").map(Number);
+
+    const date = new Date(year, month - 1, day);
+
+    return date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
   }
 
   if (loading) {
@@ -101,9 +150,7 @@ export default function HistoryPage() {
     >
       <h1>Thea&apos;s Food History</h1>
 
-      <p>
-        Everything Thea has tried, with her preferences and notes.
-      </p>
+      <p>Everything Thea has tried, with her preferences and notes.</p>
 
       {message && (
         <p
@@ -132,11 +179,11 @@ export default function HistoryPage() {
             }}
           >
             <h2 style={{ marginTop: 0 }}>
-              {exposure.foods?.[0]?.name ?? "Unknown food"}
+              {exposure.food_name}
             </h2>
 
             <p>
-              <strong>Date:</strong> {exposure.eaten_at}
+              <strong>Date:</strong> {formatDate(exposure.eaten_at)}
             </p>
 
             <p>

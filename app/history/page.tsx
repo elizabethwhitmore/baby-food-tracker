@@ -138,23 +138,25 @@ export default function HistoryPage() {
     return cutoff;
   }
 
-  const filteredExposures = useMemo(() => {
+  function exposureIsInSelectedRange(exposure: Exposure) {
     if (dateRange === "all") {
-      return exposures;
+      return true;
     }
 
     const days = dateRange === "7" ? 7 : 30;
     const cutoff = getCutoffDate(days);
 
-    return exposures.filter((exposure) => {
-      const [year, month, day] = exposure.eaten_at.split("-").map(Number);
-      const eatenDate = new Date(year, month - 1, day);
+    const [year, month, day] = exposure.eaten_at.split("-").map(Number);
+    const eatenDate = new Date(year, month - 1, day);
 
-      return eatenDate >= cutoff;
-    });
+    return eatenDate >= cutoff;
+  }
+
+  const filteredExposures = useMemo(() => {
+    return exposures.filter(exposureIsInSelectedRange);
   }, [exposures, dateRange]);
 
-  const foodsTried = useMemo(() => {
+  const allTimeFoodSummaries = useMemo(() => {
     const grouped = new Map<
       string,
       {
@@ -164,7 +166,7 @@ export default function HistoryPage() {
       }
     >();
 
-    for (const exposure of filteredExposures) {
+    for (const exposure of exposures) {
       const existing = grouped.get(exposure.food_id);
 
       if (existing) {
@@ -199,7 +201,21 @@ export default function HistoryPage() {
         };
       })
       .sort((a, b) => b.last_tried.localeCompare(a.last_tried));
-  }, [filteredExposures]);
+  }, [exposures]);
+
+  const foodsTried = useMemo(() => {
+    if (dateRange === "all") {
+      return allTimeFoodSummaries;
+    }
+
+    const foodIdsInRange = new Set(
+      filteredExposures.map((exposure) => exposure.food_id)
+    );
+
+    return allTimeFoodSummaries.filter((food) =>
+      foodIdsInRange.has(food.food_id)
+    );
+  }, [allTimeFoodSummaries, filteredExposures, dateRange]);
 
   const buttonStyle = (active: boolean) => ({
     padding: "10px 14px",

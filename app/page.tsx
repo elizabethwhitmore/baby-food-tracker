@@ -3,15 +3,27 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+type Food = {
+  id: string;
+  name: string;
+};
+
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [babyId, setBabyId] = useState("");
   const [babyName, setBabyName] = useState("");
   const [plantGoal, setPlantGoal] = useState<number | null>(null);
 
+  const [foods, setFoods] = useState<Food[]>([]);
+  const [selectedFoodId, setSelectedFoodId] = useState("");
+  const [preference, setPreference] = useState("");
+  const [notes, setNotes] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
+  const [savingFood, setSavingFood] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -29,6 +41,7 @@ export default function Home() {
       return;
     }
 
+    setBabyId(baby.id);
     setBabyName(baby.name);
 
     const { data: settings, error: settingsError } = await supabase
@@ -43,6 +56,20 @@ export default function Home() {
     }
 
     setPlantGoal(settings.weekly_plant_goal);
+  }
+
+  async function loadFoods() {
+    const { data, error } = await supabase
+      .from("foods")
+      .select("id, name")
+      .order("name");
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setFoods(data ?? []);
   }
 
   useEffect(() => {
@@ -61,6 +88,7 @@ export default function Home() {
       if (session) {
         setSignedIn(true);
         await loadBabyData();
+        await loadFoods();
       }
 
       setLoading(false);
@@ -86,16 +114,61 @@ export default function Home() {
 
     setSignedIn(true);
     await loadBabyData();
+    await loadFoods();
 
     setSigningIn(false);
+  }
+
+  async function saveFoodExposure() {
+    setMessage("");
+
+    if (!selectedFoodId) {
+      setMessage("Please choose a food.");
+      return;
+    }
+
+    setSavingFood(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setMessage("Could not identify the signed-in user.");
+      setSavingFood(false);
+      return;
+    }
+
+    const { error } = await supabase.from("food_exposures").insert({
+      baby_id: babyId,
+      food_id: selectedFoodId,
+      preference: preference || null,
+      notes: notes || null,
+      recorded_by: user.id,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setSavingFood(false);
+      return;
+    }
+
+    setMessage("Food saved!");
+    setSelectedFoodId("");
+    setPreference("");
+    setNotes("");
+    setSavingFood(false);
   }
 
   async function signOut() {
     await supabase.auth.signOut();
 
     setSignedIn(false);
+    setBabyId("");
     setBabyName("");
     setPlantGoal(null);
+    setFoods([]);
     setEmail("");
     setPassword("");
     setMessage("");
@@ -207,9 +280,78 @@ export default function Home() {
         }}
       >
         <h2>🍓 Log Food</h2>
-        <p>
-          Soon you&apos;ll be able to tell me what Thea ate in normal language.
-        </p>
+
+        <label>
+          Food
+          <select
+            value={selectedFoodId}
+            onChange={(e) => setSelectedFoodId(e.target.value)}
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "12px",
+              marginTop: "8px",
+              marginBottom: "16px",
+            }}
+          >
+            <option value="">Choose a food</option>
+
+            {foods.map((food) => (
+              <option key={food.id} value={food.id}>
+                {food.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Preference
+          <select
+            value={preference}
+            onChange={(e) => setPreference(e.target.value)}
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "12px",
+              marginTop: "8px",
+              marginBottom: "16px",
+            }}
+          >
+            <option value="">Not recorded</option>
+            <option value="loved">Loved ❤️</option>
+            <option value="liked">Liked 🙂</option>
+            <option value="neutral">Neutral 😐</option>
+            <option value="disliked">Didn&apos;t like 🙅‍♀️</option>
+          </select>
+        </label>
+
+        <label>
+          Notes
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Optional notes"
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "12px",
+              marginTop: "8px",
+              marginBottom: "16px",
+              boxSizing: "border-box",
+            }}
+          />
+        </label>
+
+        <button
+          onClick={saveFoodExposure}
+          disabled={savingFood}
+          style={{
+            padding: "12px 18px",
+            cursor: "pointer",
+          }}
+        >
+          {savingFood ? "Saving..." : "Save food"}
+        </button>
       </section>
 
       <section

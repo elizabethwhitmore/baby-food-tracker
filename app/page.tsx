@@ -4,72 +4,101 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function Home() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [babyName, setBabyName] = useState("");
   const [plantGoal, setPlantGoal] = useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
+  const [signingIn, setSigningIn] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function loadBabyData() {
+    const { data: baby, error: babyError } = await supabase
+      .from("babies")
+      .select("id, name")
+      .limit(1)
+      .single();
+
+    if (babyError || !baby) {
+      setMessage(
+        babyError?.message ?? "Could not find Thea's baby record."
+      );
+      return;
+    }
+
+    setBabyName(baby.name);
+
+    const { data: settings, error: settingsError } = await supabase
+      .from("baby_settings")
+      .select("weekly_plant_goal")
+      .eq("baby_id", baby.id)
+      .single();
+
+    if (settingsError) {
+      setMessage(settingsError.message);
+      return;
+    }
+
+    setPlantGoal(settings.weekly_plant_goal);
+  }
 
   useEffect(() => {
-    async function loadApp() {
+    async function checkSession() {
       const {
         data: { session },
-        error: sessionError,
+        error,
       } = await supabase.auth.getSession();
 
-      if (sessionError) {
-        setErrorMessage(sessionError.message);
+      if (error) {
+        setMessage(error.message);
         setLoading(false);
         return;
       }
 
-      if (!session) {
-        setSignedIn(false);
-        setLoading(false);
-        return;
+      if (session) {
+        setSignedIn(true);
+        await loadBabyData();
       }
 
-      setSignedIn(true);
-
-      const { data: baby, error: babyError } = await supabase
-        .from("babies")
-        .select("id, name")
-        .limit(1)
-        .single();
-
-      if (babyError || !baby) {
-        setErrorMessage(
-          babyError?.message ?? "Could not find Thea's baby record."
-        );
-        setLoading(false);
-        return;
-      }
-
-      setBabyName(baby.name);
-
-      const { data: settings, error: settingsError } = await supabase
-        .from("baby_settings")
-        .select("weekly_plant_goal")
-        .eq("baby_id", baby.id)
-        .single();
-
-      if (settingsError) {
-        setErrorMessage(settingsError.message);
-        setLoading(false);
-        return;
-      }
-
-      setPlantGoal(settings.weekly_plant_goal);
       setLoading(false);
     }
 
-    loadApp();
+    checkSession();
   }, []);
+
+  async function signIn() {
+    setSigningIn(true);
+    setMessage("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setSigningIn(false);
+      return;
+    }
+
+    setSignedIn(true);
+    await loadBabyData();
+
+    setSigningIn(false);
+  }
 
   async function signOut() {
     await supabase.auth.signOut();
+
     setSignedIn(false);
     setBabyName("");
+    setPlantGoal(null);
+    setEmail("");
+    setPassword("");
+    setMessage("");
   }
 
   if (loading) {
@@ -80,21 +109,63 @@ export default function Home() {
     );
   }
 
-  if (errorMessage) {
-    return (
-      <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
-        <h1>Thea&apos;s Food Tracker</h1>
-        <p>Error: {errorMessage}</p>
-      </main>
-    );
-  }
-
   if (!signedIn) {
     return (
-      <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
+      <main
+        style={{
+          maxWidth: "420px",
+          margin: "80px auto",
+          padding: "24px",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
         <h1>Thea&apos;s Food Tracker</h1>
-        <p>You&apos;re signed out.</p>
-        <p>We&apos;ll restore the login screen next.</p>
+
+        <p>
+          Sign in to track Thea&apos;s foods, plants, allergens, and favorites.
+        </p>
+
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "12px",
+            marginTop: "20px",
+            marginBottom: "12px",
+            boxSizing: "border-box",
+          }}
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "12px",
+            marginBottom: "12px",
+            boxSizing: "border-box",
+          }}
+        />
+
+        <button
+          onClick={signIn}
+          disabled={signingIn}
+          style={{
+            padding: "12px 18px",
+            cursor: "pointer",
+          }}
+        >
+          {signingIn ? "Signing in..." : "Sign in"}
+        </button>
+
+        {message && <p style={{ marginTop: "16px" }}>{message}</p>}
       </main>
     );
   }
@@ -108,7 +179,7 @@ export default function Home() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h1>{babyName}&apos;s Food Tracker</h1>
+      <h1>{babyName || "Thea"}&apos;s Food Tracker</h1>
 
       <section
         style={{
@@ -137,8 +208,7 @@ export default function Home() {
       >
         <h2>🍓 Log Food</h2>
         <p>
-          Soon you&apos;ll be able to tell me what Thea ate in normal
-          language.
+          Soon you&apos;ll be able to tell me what Thea ate in normal language.
         </p>
       </section>
 
@@ -156,6 +226,8 @@ export default function Home() {
           and can include previously disliked foods for repeat exposure.
         </p>
       </section>
+
+      {message && <p style={{ marginTop: "16px" }}>{message}</p>}
 
       <button
         onClick={signOut}

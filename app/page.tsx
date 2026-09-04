@@ -32,7 +32,6 @@ export default function Home() {
     const today = new Date();
     const day = today.getDay();
 
-    // Monday = start of the week
     const daysSinceMonday = day === 0 ? 6 : day - 1;
 
     const monday = new Date(today);
@@ -308,6 +307,28 @@ export default function Home() {
     >
       <h1>{babyName || "Thea"}&apos;s Food Tracker</h1>
 
+      <nav
+        style={{
+          display: "flex",
+          gap: "16px",
+          flexWrap: "wrap",
+          marginTop: "16px",
+          marginBottom: "24px",
+        }}
+      >
+        <a href="/" style={{ fontWeight: "bold" }}>
+          🏠 Home
+        </a>
+
+        <a href="/history">
+          📖 History
+        </a>
+
+        <a href="/allergens">
+          🥜 Allergens
+        </a>
+      </nav>
+
       <section
         style={{
           border: "1px solid #ddd",
@@ -375,7 +396,7 @@ export default function Home() {
             <option value="loved">Loved ❤️</option>
             <option value="liked">Liked 🙂</option>
             <option value="neutral">Neutral 😐</option>
-            <option value="disliked">Didn&apos;t like 🙅‍♀️</option>
+            <option value="disliked">Didn't like 🙅‍♀️</option>
           </select>
         </label>
 

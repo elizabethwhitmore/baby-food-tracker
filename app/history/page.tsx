@@ -9,11 +9,17 @@ type Exposure = {
   eaten_at: string;
   preference: string | null;
   notes: string | null;
+  recorded_by: string | null;
 };
 
 type Food = {
   id: string;
   name: string;
+};
+
+type HouseholdMember = {
+  user_id: string;
+  display_name: string | null;
 };
 
 type DateRange = "all" | "7" | "30";
@@ -62,8 +68,10 @@ function isWithinRange(dateString: string, range: DateRange) {
 export default function HistoryPage() {
   const [exposures, setExposures] = useState<Exposure[]>([]);
   const [foods, setFoods] = useState<Food[]>([]);
+  const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>("history");
   const [dateRange, setDateRange] = useState<DateRange>("all");
@@ -75,7 +83,9 @@ export default function HistoryPage() {
 
       const { data: exposureData, error: exposureError } = await supabase
         .from("food_exposures")
-        .select("id, food_id, eaten_at, preference, notes")
+        .select(
+          "id, food_id, eaten_at, preference, notes, recorded_by"
+        )
         .order("eaten_at", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -96,8 +106,19 @@ export default function HistoryPage() {
         return;
       }
 
+      const { data: memberData, error: memberError } = await supabase
+        .from("household_members")
+        .select("user_id, display_name");
+
+      if (memberError) {
+        setMessage(memberError.message);
+        setLoading(false);
+        return;
+      }
+
       setExposures((exposureData ?? []) as Exposure[]);
       setFoods((foodData ?? []) as Food[]);
+      setMembers((memberData ?? []) as HouseholdMember[]);
       setLoading(false);
     }
 
@@ -107,6 +128,15 @@ export default function HistoryPage() {
   const foodNameMap = useMemo(() => {
     return new Map(foods.map((food) => [food.id, food.name]));
   }, [foods]);
+
+  const recorderNameMap = useMemo(() => {
+    return new Map(
+      members.map((member) => [
+        member.user_id,
+        member.display_name ?? "Unknown",
+      ])
+    );
+  }, [members]);
 
   const filteredHistory = useMemo(() => {
     return exposures.filter((exposure) =>
@@ -144,6 +174,39 @@ export default function HistoryPage() {
       b.mostRecentDate.localeCompare(a.mostRecentDate)
     );
   }, [exposures, dateRange, foodNameMap]);
+
+  async function deleteExposure(exposure: Exposure) {
+    const foodName =
+      foodNameMap.get(exposure.food_id) ?? "this food exposure";
+
+    const confirmed = window.confirm(
+      `Delete ${foodName} from ${formatDate(exposure.eaten_at)}?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(exposure.id);
+    setMessage("");
+
+    const { error } = await supabase
+      .from("food_exposures")
+      .delete()
+      .eq("id", exposure.id);
+
+    if (error) {
+      setMessage(error.message);
+      setDeletingId(null);
+      return;
+    }
+
+    setExposures((current) =>
+      current.filter((item) => item.id !== exposure.id)
+    );
+
+    setDeletingId(null);
+  }
 
   if (loading) {
     return (
@@ -282,11 +345,34 @@ export default function HistoryPage() {
                   </strong>
                 </p>
 
+                <p className="muted">
+                  Recorded by:{" "}
+                  <strong>
+                    {exposure.recorded_by
+                      ? recorderNameMap.get(exposure.recorded_by) ??
+                        "Unknown"
+                      : "Unknown"}
+                  </strong>
+                </p>
+
                 {exposure.notes && (
-                  <p className="muted" style={{ marginBottom: 0 }}>
+                  <p className="muted">
                     {exposure.notes}
                   </p>
                 )}
+
+                <button
+                  className="secondary-button"
+                  onClick={() => deleteExposure(exposure)}
+                  disabled={deletingId === exposure.id}
+                  style={{
+                    marginTop: "8px",
+                  }}
+                >
+                  {deletingId === exposure.id
+                    ? "Deleting..."
+                    : "Delete"}
+                </button>
               </section>
             ))
           )}

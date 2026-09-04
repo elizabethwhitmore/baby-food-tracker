@@ -1,309 +1,157 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../lib/supabase";
 
-type Food = {
+type Allergen = {
   id: string;
   name: string;
 };
 
-export default function Home() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+type Exposure = {
+  food_id: string;
+  eaten_at: string;
+};
 
-  const [babyId, setBabyId] = useState("");
-  const [babyName, setBabyName] = useState("");
-  const [plantGoal, setPlantGoal] = useState<number | null>(null);
-  const [plantCount, setPlantCount] = useState(0);
+type FoodAllergen = {
+  food_id: string;
+  allergen_id: string;
+};
 
-  const [foods, setFoods] = useState<Food[]>([]);
-  const [selectedFoodId, setSelectedFoodId] = useState("");
-  const [preference, setPreference] = useState("");
-  const [notes, setNotes] = useState("");
+type AllergenSummary = {
+  id: string;
+  name: string;
+  count: number;
+  mostRecent: string | null;
+};
 
+const allergenEmojis: Record<string, string> = {
+  Milk: "🥛",
+  Egg: "🥚",
+  Peanut: "🥜",
+  "Tree Nuts": "🌰",
+  Wheat: "🌾",
+  Soy: "🫘",
+  Sesame: "🌱",
+  Fish: "🐟",
+  "Crustacean Shellfish": "🦐",
+};
+
+function formatDate(dateString: string) {
+  return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export default function AllergensPage() {
+  const [allergens, setAllergens] = useState<AllergenSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [signingIn, setSigningIn] = useState(false);
-  const [savingFood, setSavingFood] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
   const [message, setMessage] = useState("");
 
-  function getStartOfWeek() {
-    const today = new Date();
-    const day = today.getDay();
-
-    const daysSinceMonday = day === 0 ? 6 : day - 1;
-
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - daysSinceMonday);
-
-    return [
-      monday.getFullYear(),
-      String(monday.getMonth() + 1).padStart(2, "0"),
-      String(monday.getDate()).padStart(2, "0"),
-    ].join("-");
-  }
-
-  async function loadPlantCount(currentBabyId: string) {
-    const startOfWeek = getStartOfWeek();
-
-    const { data: exposures, error: exposureError } = await supabase
-      .from("food_exposures")
-      .select("food_id")
-      .eq("baby_id", currentBabyId)
-      .gte("eaten_at", startOfWeek);
-
-    if (exposureError) {
-      setMessage(exposureError.message);
-      return;
-    }
-
-    const foodIds = [
-      ...new Set((exposures ?? []).map((exposure) => exposure.food_id)),
-    ];
-
-    if (foodIds.length === 0) {
-      setPlantCount(0);
-      return;
-    }
-
-    const { data: mappings, error: mappingError } = await supabase
-      .from("food_plant_types")
-      .select("plant_type_id")
-      .in("food_id", foodIds);
-
-    if (mappingError) {
-      setMessage(mappingError.message);
-      return;
-    }
-
-    const uniquePlants = new Set(
-      (mappings ?? []).map((mapping) => mapping.plant_type_id)
-    );
-
-    setPlantCount(uniquePlants.size);
-  }
-
-  async function loadBabyData() {
-    const { data: baby, error: babyError } = await supabase
-      .from("babies")
-      .select("id, name")
-      .limit(1)
-      .single();
-
-    if (babyError || !baby) {
-      setMessage(
-        babyError?.message ?? "Could not find Thea's baby record."
-      );
-      return;
-    }
-
-    setBabyId(baby.id);
-    setBabyName(baby.name);
-
-    const { data: settings, error: settingsError } = await supabase
-      .from("baby_settings")
-      .select("weekly_plant_goal")
-      .eq("baby_id", baby.id)
-      .single();
-
-    if (settingsError) {
-      setMessage(settingsError.message);
-      return;
-    }
-
-    setPlantGoal(settings.weekly_plant_goal);
-
-    await loadPlantCount(baby.id);
-  }
-
-  async function loadFoods() {
-    const { data, error } = await supabase
-      .from("foods")
-      .select("id, name")
-      .order("name");
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setFoods(data ?? []);
-  }
-
   useEffect(() => {
-    async function checkSession() {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
+    async function loadAllergens() {
+      setLoading(true);
+      setMessage("");
 
-      if (error) {
-        setMessage(error.message);
+      const { data: majorAllergens, error: allergenError } = await supabase
+        .from("allergens")
+        .select("id, name")
+        .eq("is_major_us_allergen", true)
+        .order("name");
+
+      if (allergenError) {
+        setMessage(allergenError.message);
         setLoading(false);
         return;
       }
 
-      if (session) {
-        setSignedIn(true);
-        await loadBabyData();
-        await loadFoods();
+      const { data: exposures, error: exposureError } = await supabase
+        .from("food_exposures")
+        .select("food_id, eaten_at");
+
+      if (exposureError) {
+        setMessage(exposureError.message);
+        setLoading(false);
+        return;
       }
 
+      const exposedFoodIds = [
+        ...new Set((exposures ?? []).map((exposure) => exposure.food_id)),
+      ];
+
+      let foodAllergenMappings: FoodAllergen[] = [];
+
+      if (exposedFoodIds.length > 0) {
+        const { data: mappings, error: mappingError } = await supabase
+          .from("food_allergens")
+          .select("food_id, allergen_id")
+          .in("food_id", exposedFoodIds);
+
+        if (mappingError) {
+          setMessage(mappingError.message);
+          setLoading(false);
+          return;
+        }
+
+        foodAllergenMappings = mappings ?? [];
+      }
+
+      const summaries: AllergenSummary[] = (
+        (majorAllergens ?? []) as Allergen[]
+      ).map((allergen) => {
+        const matchingFoodIds = new Set(
+          foodAllergenMappings
+            .filter((mapping) => mapping.allergen_id === allergen.id)
+            .map((mapping) => mapping.food_id)
+        );
+
+        const matchingExposures = ((exposures ?? []) as Exposure[]).filter(
+          (exposure) => matchingFoodIds.has(exposure.food_id)
+        );
+
+        const dates = matchingExposures
+          .map((exposure) => exposure.eaten_at)
+          .sort();
+
+        return {
+          id: allergen.id,
+          name: allergen.name,
+          count: matchingExposures.length,
+          mostRecent: dates.length > 0 ? dates[dates.length - 1] : null,
+        };
+      });
+
+      setAllergens(summaries);
       setLoading(false);
     }
 
-    checkSession();
+    loadAllergens();
   }, []);
 
-  async function signIn() {
-    setSigningIn(true);
-    setMessage("");
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setMessage(error.message);
-      setSigningIn(false);
-      return;
-    }
-
-    setSignedIn(true);
-    await loadBabyData();
-    await loadFoods();
-    setSigningIn(false);
-  }
-
-  async function saveFoodExposure() {
-    setMessage("");
-
-    if (!selectedFoodId) {
-      setMessage("Please choose a food.");
-      return;
-    }
-
-    setSavingFood(true);
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      setMessage("Could not identify the signed-in user.");
-      setSavingFood(false);
-      return;
-    }
-
-    const { error } = await supabase.from("food_exposures").insert({
-      baby_id: babyId,
-      food_id: selectedFoodId,
-      preference: preference || null,
-      notes: notes || null,
-      recorded_by: user.id,
-    });
-
-    if (error) {
-      setMessage(error.message);
-      setSavingFood(false);
-      return;
-    }
-
-    setSelectedFoodId("");
-    setPreference("");
-    setNotes("");
-
-    await loadPlantCount(babyId);
-
-    setMessage("Food saved! ✓");
-    setSavingFood(false);
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut();
-
-    setSignedIn(false);
-    setBabyId("");
-    setBabyName("");
-    setPlantGoal(null);
-    setPlantCount(0);
-    setFoods([]);
-    setEmail("");
-    setPassword("");
-    setMessage("");
-  }
+  const introducedCount = allergens.filter(
+    (allergen) => allergen.count > 0
+  ).length;
 
   if (loading) {
     return (
       <main className="app-shell">
-        <p>Loading...</p>
-      </main>
-    );
-  }
-
-  if (!signedIn) {
-    return (
-      <main className="app-shell" style={{ maxWidth: "460px" }}>
-        <h1 className="page-title">Thea&apos;s Food Tracker</h1>
-
-        <p className="page-subtitle">
-          Sign in to track Thea&apos;s food journey.
-        </p>
-
-        <section className="card">
-          <label className="label">
-            Email
-            <input
-              className="field"
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ marginTop: "8px", marginBottom: "16px" }}
-            />
-          </label>
-
-          <label className="label">
-            Password
-            <input
-              className="field"
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ marginTop: "8px", marginBottom: "18px" }}
-            />
-          </label>
-
-          <button
-            className="primary-button"
-            onClick={signIn}
-            disabled={signingIn}
-          >
-            {signingIn ? "Signing in..." : "Sign in"}
-          </button>
-
-          {message && <p className="message">{message}</p>}
-        </section>
+        <p>Loading allergens...</p>
       </main>
     );
   }
 
   return (
     <main className="app-shell">
-      <h1 className="page-title">
-        {babyName || "Thea"}&apos;s Food Tracker
-      </h1>
+      <h1 className="page-title">Thea&apos;s Allergens</h1>
 
       <p className="page-subtitle">
-        A simple place to track foods, preferences, plants, and allergens.
+        Track Thea&apos;s exposure to the major U.S. food allergens.
       </p>
 
       <nav className="nav-card">
-        <a href="/" className="nav-link active">
+        <a href="/" className="nav-link">
           🏠 Home
         </a>
 
@@ -311,95 +159,58 @@ export default function Home() {
           📖 History
         </a>
 
-        <a href="/allergens" className="nav-link">
+        <a href="/allergens" className="nav-link active">
           🥜 Allergens
         </a>
       </nav>
 
-      <section className="card green">
-        <h2 className="section-title">🌱 This Week</h2>
-
-        <p className="big-number">
-          {plantCount} / {plantGoal ?? 25}
-        </p>
-
-        <p className="muted" style={{ marginBottom: 0 }}>
-          different plant types
-        </p>
-      </section>
-
-      <section className="card">
-        <h2 className="section-title">🍓 Log Food</h2>
-
-        <label className="label">
-          Food
-          <select
-            className="select-field"
-            value={selectedFoodId}
-            onChange={(e) => setSelectedFoodId(e.target.value)}
-          >
-            <option value="">Choose a food</option>
-
-            {foods.map((food) => (
-              <option key={food.id} value={food.id}>
-                {food.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="label">
-          Preference
-          <select
-            className="select-field"
-            value={preference}
-            onChange={(e) => setPreference(e.target.value)}
-          >
-            <option value="">Not recorded</option>
-            <option value="loved">Loved ❤️</option>
-            <option value="liked">Liked 🙂</option>
-            <option value="neutral">Neutral 😐</option>
-            <option value="disliked">Didn't like 🙅‍♀️</option>
-          </select>
-        </label>
-
-        <label className="label">
-          Notes
-          <textarea
-            className="textarea-field"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional notes"
-          />
-        </label>
-
-        <button
-          className="primary-button"
-          onClick={saveFoodExposure}
-          disabled={savingFood}
-        >
-          {savingFood ? "Saving..." : "Save food"}
-        </button>
-
-        {message && <p className="message">{message}</p>}
-      </section>
+      {message && <p className="message">{message}</p>}
 
       <section className="card soft">
-        <h2 className="section-title">💡 Meal Ideas</h2>
+        <h2 className="section-title">Allergen Progress</h2>
+
+        <p className="big-number">
+          {introducedCount} / {allergens.length}
+        </p>
 
         <p className="muted" style={{ marginBottom: 0 }}>
-          At least one safe food, no more than one new food, with repeat
-          exposure encouraged.
+          major allergens introduced
         </p>
       </section>
 
-      <button
-        className="secondary-button"
-        onClick={signOut}
-        style={{ marginTop: "24px" }}
-      >
-        Sign out
-      </button>
+      {allergens.map((allergen) => {
+        const emoji = allergenEmojis[allergen.name] ?? "🍽️";
+
+        return (
+          <section className="card" key={allergen.id}>
+            <h2 className="section-title">
+              {emoji} {allergen.name}
+            </h2>
+
+            {allergen.count > 0 ? (
+              <>
+                <p>
+                  <strong>
+                    {allergen.count}{" "}
+                    {allergen.count === 1 ? "exposure" : "exposures"}
+                  </strong>
+                </p>
+
+                <p className="muted" style={{ marginBottom: 0 }}>
+                  Most recent:{" "}
+                  {allergen.mostRecent
+                    ? formatDate(allergen.mostRecent)
+                    : "Not recorded"}
+                </p>
+              </>
+            ) : (
+              <p className="muted" style={{ marginBottom: 0 }}>
+                Not yet introduced
+              </p>
+            )}
+          </section>
+        );
+      })}
     </main>
   );
 }

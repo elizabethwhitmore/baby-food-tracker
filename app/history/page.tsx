@@ -329,8 +329,41 @@ export default function HistoryPage() {
             </section>
           ) : (
             filteredHistory.map((exposure) => (
-              <section className="card" key={exposure.id}>
-                <h2 className="section-title">
+              <section
+                className="card"
+                key={exposure.id}
+                style={{ position: "relative" }}
+              >
+                <button
+                  onClick={() => deleteExposure(exposure)}
+                  disabled={deletingId === exposure.id}
+                  aria-label={`Delete ${
+                    foodNameMap.get(exposure.food_id) ?? "food exposure"
+                  }`}
+                  title="Delete"
+                  style={{
+                    position: "absolute",
+                    top: "16px",
+                    right: "16px",
+                    border: "none",
+                    background: "transparent",
+                    fontSize: "20px",
+                    cursor:
+                      deletingId === exposure.id
+                        ? "not-allowed"
+                        : "pointer",
+                    opacity:
+                      deletingId === exposure.id ? 0.45 : 0.7,
+                    padding: "4px",
+                  }}
+                >
+                  🗑️
+                </button>
+
+                <h2
+                  className="section-title"
+                  style={{ paddingRight: "42px" }}
+                >
                   {foodNameMap.get(exposure.food_id) ?? "Unknown food"}
                 </h2>
 
@@ -356,23 +389,10 @@ export default function HistoryPage() {
                 </p>
 
                 {exposure.notes && (
-                  <p className="muted">
+                  <p className="muted" style={{ marginBottom: 0 }}>
                     {exposure.notes}
                   </p>
                 )}
-
-                <button
-                  className="secondary-button"
-                  onClick={() => deleteExposure(exposure)}
-                  disabled={deletingId === exposure.id}
-                  style={{
-                    marginTop: "8px",
-                  }}
-                >
-                  {deletingId === exposure.id
-                    ? "Deleting..."
-                    : "Delete"}
-                </button>
               </section>
             ))
           )}

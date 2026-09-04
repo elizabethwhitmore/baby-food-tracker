@@ -91,7 +91,9 @@ export default function Home() {
       .single();
 
     if (babyError || !baby) {
-      setMessage(babyError?.message ?? "Could not find Thea's baby record.");
+      setMessage(
+        babyError?.message ?? "Could not find Thea's baby record."
+      );
       return;
     }
 
@@ -110,7 +112,6 @@ export default function Home() {
     }
 
     setPlantGoal(settings.weekly_plant_goal);
-
     await loadPlantCount(baby.id);
   }
 
@@ -118,6 +119,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from("foods")
       .select("id, name")
+      .eq("show_in_dropdown", true)
       .order("name");
 
     if (error) {
@@ -253,25 +255,33 @@ export default function Home() {
         <section className="card">
           <label className="label">
             Email
+
             <input
               className="field"
               type="email"
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{ marginTop: "8px", marginBottom: "16px" }}
+              style={{
+                marginTop: "8px",
+                marginBottom: "16px",
+              }}
             />
           </label>
 
           <label className="label">
             Password
+
             <input
               className="field"
               type="password"
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{ marginTop: "8px", marginBottom: "18px" }}
+              style={{
+                marginTop: "8px",
+                marginBottom: "18px",
+              }}
             />
           </label>
 
@@ -330,6 +340,7 @@ export default function Home() {
 
         <label className="label">
           Food
+
           <select
             className="select-field"
             value={selectedFoodId}
@@ -347,6 +358,7 @@ export default function Home() {
 
         <label className="label">
           Preference
+
           <select
             className="select-field"
             value={preference}
@@ -362,6 +374,7 @@ export default function Home() {
 
         <label className="label">
           Notes
+
           <textarea
             className="textarea-field"
             value={notes}

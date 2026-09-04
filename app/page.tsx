@@ -7,17 +7,29 @@ export default function Home() {
   const [babyName, setBabyName] = useState("");
   const [plantGoal, setPlantGoal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadApp() {
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (!session) {
-        window.location.reload();
+      if (sessionError) {
+        setErrorMessage(sessionError.message);
+        setLoading(false);
         return;
       }
+
+      if (!session) {
+        setSignedIn(false);
+        setLoading(false);
+        return;
+      }
+
+      setSignedIn(true);
 
       const { data: baby, error: babyError } = await supabase
         .from("babies")
@@ -26,22 +38,28 @@ export default function Home() {
         .single();
 
       if (babyError || !baby) {
+        setErrorMessage(
+          babyError?.message ?? "Could not find Thea's baby record."
+        );
         setLoading(false);
         return;
       }
 
       setBabyName(baby.name);
 
-      const { data: settings } = await supabase
+      const { data: settings, error: settingsError } = await supabase
         .from("baby_settings")
         .select("weekly_plant_goal")
         .eq("baby_id", baby.id)
         .single();
 
-      if (settings) {
-        setPlantGoal(settings.weekly_plant_goal);
+      if (settingsError) {
+        setErrorMessage(settingsError.message);
+        setLoading(false);
+        return;
       }
 
+      setPlantGoal(settings.weekly_plant_goal);
       setLoading(false);
     }
 
@@ -50,11 +68,35 @@ export default function Home() {
 
   async function signOut() {
     await supabase.auth.signOut();
-    window.location.reload();
+    setSignedIn(false);
+    setBabyName("");
   }
 
   if (loading) {
-    return <main style={{ padding: "40px" }}>Loading...</main>;
+    return (
+      <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
+        Loading...
+      </main>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
+        <h1>Thea&apos;s Food Tracker</h1>
+        <p>Error: {errorMessage}</p>
+      </main>
+    );
+  }
+
+  if (!signedIn) {
+    return (
+      <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
+        <h1>Thea&apos;s Food Tracker</h1>
+        <p>You&apos;re signed out.</p>
+        <p>We&apos;ll restore the login screen next.</p>
+      </main>
+    );
   }
 
   return (
@@ -110,8 +152,8 @@ export default function Home() {
       >
         <h2>💡 Meal Ideas</h2>
         <p>
-          Meals will include at least one safe food, no more than one new
-          food, and can include previously disliked foods for repeat exposure.
+          Meals will include at least one safe food, no more than one new food,
+          and can include previously disliked foods for repeat exposure.
         </p>
       </section>
 

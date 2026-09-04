@@ -371,12 +371,14 @@ export default function HistoryPage() {
                   <strong>{formatDate(exposure.eaten_at)}</strong>
                 </p>
 
-                <p>
-                  Preference:{" "}
-                  <strong>
-                    {getPreferenceLabel(exposure.preference)}
-                  </strong>
-                </p>
+                {exposure.preference && (
+                  <p>
+                    Preference:{" "}
+                    <strong>
+                      {getPreferenceLabel(exposure.preference)}
+                    </strong>
+                  </p>
+                )}
 
                 <p className="muted">
                   Recorded by:{" "}
@@ -426,12 +428,14 @@ export default function HistoryPage() {
                   Total exposures: <strong>{food.count}</strong>
                 </p>
 
-                <p style={{ marginBottom: 0 }}>
-                  Latest preference:{" "}
-                  <strong>
-                    {getPreferenceLabel(food.latestPreference)}
-                  </strong>
-                </p>
+                {food.latestPreference && (
+                  <p style={{ marginBottom: 0 }}>
+                    Latest preference:{" "}
+                    <strong>
+                      {getPreferenceLabel(food.latestPreference)}
+                    </strong>
+                  </p>
+                )}
               </section>
             ))
           )}

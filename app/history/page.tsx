@@ -6,17 +6,62 @@ import { supabase } from "../../lib/supabase";
 type Exposure = {
   id: string;
   food_id: string;
-  food_name: string;
   eaten_at: string;
   preference: string | null;
   notes: string | null;
 };
 
-type ViewMode = "history" | "foods";
+type Food = {
+  id: string;
+  name: string;
+};
+
 type DateRange = "all" | "7" | "30";
+type ViewMode = "history" | "foods";
+
+function formatDate(dateString: string) {
+  return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getPreferenceLabel(preference: string | null) {
+  switch (preference) {
+    case "loved":
+      return "Loved ❤️";
+    case "liked":
+      return "Liked 🙂";
+    case "neutral":
+      return "Neutral 😐";
+    case "disliked":
+      return "Didn't like 🙅‍♀️";
+    default:
+      return "Not recorded";
+  }
+}
+
+function isWithinRange(dateString: string, range: DateRange) {
+  if (range === "all") {
+    return true;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const date = new Date(`${dateString}T00:00:00`);
+  const days = range === "7" ? 7 : 30;
+
+  const cutoff = new Date(today);
+  cutoff.setDate(today.getDate() - (days - 1));
+
+  return date >= cutoff && date <= today;
+}
 
 export default function HistoryPage() {
   const [exposures, setExposures] = useState<Exposure[]>([]);
+  const [foods, setFoods] = useState<Food[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -25,32 +70,12 @@ export default function HistoryPage() {
 
   useEffect(() => {
     async function loadHistory() {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        setMessage(sessionError.message);
-        setLoading(false);
-        return;
-      }
-
-      if (!session) {
-        window.location.href = "/";
-        return;
-      }
+      setLoading(true);
+      setMessage("");
 
       const { data: exposureData, error: exposureError } = await supabase
         .from("food_exposures")
-        .select(`
-          id,
-          food_id,
-          eaten_at,
-          preference,
-          notes,
-          created_at
-        `)
+        .select("id, food_id, eaten_at, preference, notes")
         .order("eaten_at", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -60,20 +85,10 @@ export default function HistoryPage() {
         return;
       }
 
-      if (!exposureData || exposureData.length === 0) {
-        setExposures([]);
-        setLoading(false);
-        return;
-      }
-
-      const foodIds = [
-        ...new Set(exposureData.map((exposure) => exposure.food_id)),
-      ];
-
       const { data: foodData, error: foodError } = await supabase
         .from("foods")
         .select("id, name")
-        .in("id", foodIds);
+        .order("name");
 
       if (foodError) {
         setMessage(foodError.message);
@@ -81,352 +96,241 @@ export default function HistoryPage() {
         return;
       }
 
-      const foodNames = new Map(
-        (foodData ?? []).map((food) => [food.id, food.name])
-      );
-
-      const history: Exposure[] = exposureData.map((exposure) => ({
-        id: exposure.id,
-        food_id: exposure.food_id,
-        food_name: foodNames.get(exposure.food_id) ?? "Unknown food",
-        eaten_at: exposure.eaten_at,
-        preference: exposure.preference,
-        notes: exposure.notes,
-      }));
-
-      setExposures(history);
+      setExposures((exposureData ?? []) as Exposure[]);
+      setFoods((foodData ?? []) as Food[]);
       setLoading(false);
     }
 
     loadHistory();
   }, []);
 
-  function preferenceLabel(preference: string | null) {
-    switch (preference) {
-      case "loved":
-        return "Loved ❤️";
-      case "liked":
-        return "Liked 🙂";
-      case "neutral":
-        return "Neutral 😐";
-      case "disliked":
-        return "Didn't like 🙅‍♀️";
-      default:
-        return "Not recorded";
-    }
-  }
+  const foodNameMap = useMemo(() => {
+    return new Map(foods.map((food) => [food.id, food.name]));
+  }, [foods]);
 
-  function formatDate(dateString: string) {
-    const [year, month, day] = dateString.split("-").map(Number);
-
-    const date = new Date(year, month - 1, day);
-
-    return date.toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-
-  function getCutoffDate(days: number) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const cutoff = new Date(today);
-    cutoff.setDate(today.getDate() - (days - 1));
-
-    return cutoff;
-  }
-
-  function exposureIsInSelectedRange(exposure: Exposure) {
-    if (dateRange === "all") {
-      return true;
-    }
-
-    const days = dateRange === "7" ? 7 : 30;
-    const cutoff = getCutoffDate(days);
-
-    const [year, month, day] = exposure.eaten_at.split("-").map(Number);
-    const eatenDate = new Date(year, month - 1, day);
-
-    return eatenDate >= cutoff;
-  }
-
-  const filteredExposures = useMemo(() => {
-    return exposures.filter(exposureIsInSelectedRange);
+  const filteredHistory = useMemo(() => {
+    return exposures.filter((exposure) =>
+      isWithinRange(exposure.eaten_at, dateRange)
+    );
   }, [exposures, dateRange]);
 
-  const allTimeFoodSummaries = useMemo(() => {
-    const grouped = new Map<
-      string,
-      {
-        food_id: string;
-        food_name: string;
-        exposures: Exposure[];
-      }
-    >();
-
-    for (const exposure of exposures) {
-      const existing = grouped.get(exposure.food_id);
-
-      if (existing) {
-        existing.exposures.push(exposure);
-      } else {
-        grouped.set(exposure.food_id, {
-          food_id: exposure.food_id,
-          food_name: exposure.food_name,
-          exposures: [exposure],
-        });
-      }
-    }
-
-    return [...grouped.values()]
-      .map((group) => {
-        const sortedAscending = [...group.exposures].sort((a, b) =>
-          a.eaten_at.localeCompare(b.eaten_at)
-        );
-
-        const sortedDescending = [...group.exposures].sort((a, b) =>
-          b.eaten_at.localeCompare(a.eaten_at)
-        );
-
-        return {
-          food_id: group.food_id,
-          food_name: group.food_name,
-          exposure_count: group.exposures.length,
-          first_tried: sortedAscending[0]?.eaten_at ?? "",
-          last_tried: sortedDescending[0]?.eaten_at ?? "",
-          latest_preference:
-            sortedDescending[0]?.preference ?? null,
-        };
-      })
-      .sort((a, b) => b.last_tried.localeCompare(a.last_tried));
-  }, [exposures]);
-
   const foodsTried = useMemo(() => {
-    if (dateRange === "all") {
-      return allTimeFoodSummaries;
-    }
-
-    const foodIdsInRange = new Set(
-      filteredExposures.map((exposure) => exposure.food_id)
+    const foodIdsInSelectedRange = new Set(
+      exposures
+        .filter((exposure) => isWithinRange(exposure.eaten_at, dateRange))
+        .map((exposure) => exposure.food_id)
     );
 
-    return allTimeFoodSummaries.filter((food) =>
-      foodIdsInRange.has(food.food_id)
-    );
-  }, [allTimeFoodSummaries, filteredExposures, dateRange]);
+    const summaries = Array.from(foodIdsInSelectedRange).map((foodId) => {
+      const allTimeExposures = exposures
+        .filter((exposure) => exposure.food_id === foodId)
+        .sort((a, b) => a.eaten_at.localeCompare(b.eaten_at));
 
-  const buttonStyle = (active: boolean) => ({
-    padding: "10px 14px",
-    borderRadius: "10px",
-    border: "1px solid #bbb",
-    cursor: "pointer",
-    fontWeight: active ? "bold" : "normal",
-    background: active ? "#eee" : "white",
-  });
+      const firstExposure = allTimeExposures[0];
+      const mostRecentExposure =
+        allTimeExposures[allTimeExposures.length - 1];
+
+      return {
+        foodId,
+        foodName: foodNameMap.get(foodId) ?? "Unknown food",
+        firstDate: firstExposure?.eaten_at ?? "",
+        mostRecentDate: mostRecentExposure?.eaten_at ?? "",
+        count: allTimeExposures.length,
+        latestPreference: mostRecentExposure?.preference ?? null,
+      };
+    });
+
+    return summaries.sort((a, b) =>
+      b.mostRecentDate.localeCompare(a.mostRecentDate)
+    );
+  }, [exposures, dateRange, foodNameMap]);
 
   if (loading) {
     return (
-      <main
-        style={{
-          padding: "40px",
-          fontFamily: "Arial, sans-serif",
-        }}
-      >
-        Loading...
+      <main className="app-shell">
+        <p>Loading food history...</p>
       </main>
     );
   }
 
   return (
-    <main
-      style={{
-        maxWidth: "600px",
-        margin: "40px auto",
-        padding: "24px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1>Thea&apos;s Food History</h1>
+    <main className="app-shell">
+      <h1 className="page-title">Thea&apos;s Food History</h1>
 
-      <p>
-        Review every exposure or switch to a consolidated list of foods
-        Thea has tried.
+      <p className="page-subtitle">
+        See every exposure or review each food Thea has tried.
       </p>
 
-      <section
-        style={{
-          border: "1px solid #ddd",
-          borderRadius: "16px",
-          padding: "18px",
-          marginTop: "24px",
-        }}
-      >
-        <p style={{ marginTop: 0, fontWeight: "bold" }}>View</p>
+      <nav className="nav-card">
+        <a href="/" className="nav-link">
+          🏠 Home
+        </a>
+
+        <a href="/history" className="nav-link active">
+          📖 History
+        </a>
+
+        <a href="/allergens" className="nav-link">
+          🥜 Allergens
+        </a>
+      </nav>
+
+      {message && <p className="message">{message}</p>}
+
+      <section className="card">
+        <h2 className="section-title">View</h2>
 
         <div
           style={{
             display: "flex",
-            gap: "8px",
+            gap: "10px",
             flexWrap: "wrap",
           }}
         >
           <button
+            className={
+              viewMode === "history"
+                ? "primary-button"
+                : "secondary-button"
+            }
             onClick={() => setViewMode("history")}
-            style={buttonStyle(viewMode === "history")}
           >
             Complete Food History
           </button>
 
           <button
+            className={
+              viewMode === "foods"
+                ? "primary-button"
+                : "secondary-button"
+            }
             onClick={() => setViewMode("foods")}
-            style={buttonStyle(viewMode === "foods")}
           >
             Foods Tried
           </button>
         </div>
+      </section>
 
-        <p
-          style={{
-            marginTop: "20px",
-            marginBottom: "8px",
-            fontWeight: "bold",
-          }}
-        >
-          Date range
-        </p>
+      <section className="card soft">
+        <h2 className="section-title">Date Range</h2>
 
         <div
           style={{
             display: "flex",
-            gap: "8px",
+            gap: "10px",
             flexWrap: "wrap",
           }}
         >
           <button
+            className={
+              dateRange === "all"
+                ? "primary-button"
+                : "secondary-button"
+            }
             onClick={() => setDateRange("all")}
-            style={buttonStyle(dateRange === "all")}
           >
             All Time
           </button>
 
           <button
+            className={
+              dateRange === "7"
+                ? "primary-button"
+                : "secondary-button"
+            }
             onClick={() => setDateRange("7")}
-            style={buttonStyle(dateRange === "7")}
           >
             Past 7 Days
           </button>
 
           <button
+            className={
+              dateRange === "30"
+                ? "primary-button"
+                : "secondary-button"
+            }
             onClick={() => setDateRange("30")}
-            style={buttonStyle(dateRange === "30")}
           >
             Past 30 Days
           </button>
         </div>
       </section>
 
-      {message && (
-        <p
-          style={{
-            marginTop: "20px",
-            fontWeight: "bold",
-          }}
-        >
-          {message}
-        </p>
-      )}
-
-      {viewMode === "history" ? (
+      {viewMode === "history" && (
         <>
-          {filteredExposures.length === 0 ? (
-            <p style={{ marginTop: "30px" }}>
-              No food exposures in this date range.
-            </p>
+          {filteredHistory.length === 0 ? (
+            <section className="card">
+              <p className="muted" style={{ margin: 0 }}>
+                No food exposures in this date range.
+              </p>
+            </section>
           ) : (
-            filteredExposures.map((exposure) => (
-              <section
-                key={exposure.id}
-                style={{
-                  border: "1px solid #ddd",
-                  borderRadius: "16px",
-                  padding: "18px",
-                  marginTop: "12px",
-                }}
-              >
-                <h2 style={{ marginTop: 0 }}>
-                  {exposure.food_name}
+            filteredHistory.map((exposure) => (
+              <section className="card" key={exposure.id}>
+                <h2 className="section-title">
+                  {foodNameMap.get(exposure.food_id) ?? "Unknown food"}
                 </h2>
 
                 <p>
-                  <strong>Date:</strong>{" "}
-                  {formatDate(exposure.eaten_at)}
+                  <strong>{formatDate(exposure.eaten_at)}</strong>
                 </p>
 
                 <p>
-                  <strong>Preference:</strong>{" "}
-                  {preferenceLabel(exposure.preference)}
+                  Preference:{" "}
+                  <strong>
+                    {getPreferenceLabel(exposure.preference)}
+                  </strong>
                 </p>
 
                 {exposure.notes && (
-                  <p>
-                    <strong>Notes:</strong> {exposure.notes}
+                  <p className="muted" style={{ marginBottom: 0 }}>
+                    {exposure.notes}
                   </p>
                 )}
               </section>
             ))
           )}
         </>
-      ) : (
+      )}
+
+      {viewMode === "foods" && (
         <>
           {foodsTried.length === 0 ? (
-            <p style={{ marginTop: "30px" }}>
-              No foods tried in this date range.
-            </p>
+            <section className="card">
+              <p className="muted" style={{ margin: 0 }}>
+                No foods were eaten in this date range.
+              </p>
+            </section>
           ) : (
             foodsTried.map((food) => (
-              <section
-                key={food.food_id}
-                style={{
-                  border: "1px solid #ddd",
-                  borderRadius: "16px",
-                  padding: "18px",
-                  marginTop: "12px",
-                }}
-              >
-                <h2 style={{ marginTop: 0 }}>
-                  {food.food_name}
-                </h2>
+              <section className="card" key={food.foodId}>
+                <h2 className="section-title">{food.foodName}</h2>
 
                 <p>
-                  <strong>First tried:</strong>{" "}
-                  {formatDate(food.first_tried)}
+                  First tried:{" "}
+                  <strong>{formatDate(food.firstDate)}</strong>
                 </p>
 
                 <p>
-                  <strong>Most recent:</strong>{" "}
-                  {formatDate(food.last_tried)}
+                  Most recent:{" "}
+                  <strong>{formatDate(food.mostRecentDate)}</strong>
                 </p>
 
                 <p>
-                  <strong>Exposures:</strong>{" "}
-                  {food.exposure_count}
+                  Total exposures: <strong>{food.count}</strong>
                 </p>
 
-                <p>
-                  <strong>Latest preference:</strong>{" "}
-                  {preferenceLabel(food.latest_preference)}
+                <p style={{ marginBottom: 0 }}>
+                  Latest preference:{" "}
+                  <strong>
+                    {getPreferenceLabel(food.latestPreference)}
+                  </strong>
                 </p>
               </section>
             ))
           )}
         </>
       )}
-
-      <p style={{ marginTop: "30px" }}>
-        <a href="/">← Back to Home</a>
-      </p>
     </main>
   );
 }

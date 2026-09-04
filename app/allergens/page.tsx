@@ -84,7 +84,7 @@ export default function AllergensPage() {
         ...new Set(exposures.map((exposure) => exposure.food_id)),
       ];
 
-      // Find which allergens are connected to the foods Thea has eaten.
+      // Find which allergens are connected to foods Thea has eaten.
       const { data: mappingData, error: mappingError } = await supabase
         .from("food_allergens")
         .select("food_id, allergen_id")
@@ -155,6 +155,22 @@ export default function AllergensPage() {
       day: "numeric",
       year: "numeric",
     });
+  }
+
+  function allergenEmoji(name: string) {
+    const emojis: Record<string, string> = {
+      Milk: "🥛",
+      Egg: "🥚",
+      Peanut: "🥜",
+      "Tree Nuts": "🌰",
+      Wheat: "🌾",
+      Soy: "🫘",
+      Sesame: "🌱",
+      Fish: "🐟",
+      "Crustacean Shellfish": "🦐",
+    };
+
+    return emojis[name] ?? "🍽️";
   }
 
   const introducedCount = allergens.filter(
@@ -229,21 +245,7 @@ export default function AllergensPage() {
 
       {allergens.map((allergen) => {
         const introduced = allergen.exposureCount > 0;
-function allergenEmoji(name: string) {
-  const emojis: Record<string, string> = {
-    Milk: "🥛",
-    Egg: "🥚",
-    Peanut: "🥜",
-    "Tree Nuts": "🌰",
-    Wheat: "🌾",
-    Soy: "🫘",
-    Sesame: "🌱",
-    Fish: "🐟",
-    "Crustacean Shellfish": "🦐",
-  };
 
-  return emojis[name] ?? "🍽️";
-}
         return (
           <section
             key={allergen.id}
@@ -255,7 +257,7 @@ function allergenEmoji(name: string) {
             }}
           >
             <h2 style={{ marginTop: 0 }}>
-              {allergen.name}
+              {allergenEmoji(allergen.name)} {allergen.name}
             </h2>
 
             {introduced ? (

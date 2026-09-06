@@ -64,6 +64,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const today = new Date().toISOString().slice(0, 10);
+
     const openAIResponse = await fetch(
       "https://api.openai.com/v1/responses",
       {
@@ -81,14 +83,20 @@ export async function POST(request: Request) {
                 {
                   type: "input_text",
                   text:
-                    "You extract food information for a baby food tracker. " +
-                    "The baby's name is Thea. References to 'Thea' or 'she' refer to Thea. " +
-                    "Extract only foods that Thea actually ate. " +
-                    "Do not invent foods or preferences. " +
-                    "Do not record preparation method, amount, feeding method, or whether a food is new or repeated. " +
-                    "If a preference is clearly stated for a specific food, use loved, liked, neutral, or disliked. " +
-                    "Otherwise return null for that food's preference. " +
-                    "Return the result using the required structured JSON schema.",
+                    `You extract food information for a baby food tracker. ` +
+                    `The baby's name is Thea. References to 'Thea' or 'she' refer to Thea. ` +
+                    `Today's date is ${today}. ` +
+                    `Extract only foods that Thea actually ate. ` +
+                    `Do not invent foods or preferences. ` +
+                    `Do not record preparation method, amount, feeding method, or whether a food is new or repeated. ` +
+                    `If a preference is clearly stated for a specific food, use loved, liked, neutral, or disliked. ` +
+                    `Otherwise return null for that food's preference. ` +
+                    `Determine the date each food was eaten. ` +
+                    `If the user says today, use ${today}. ` +
+                    `If the user says yesterday, use the calendar date immediately before ${today}. ` +
+                    `If the user gives an explicit date, convert it to YYYY-MM-DD. ` +
+                    `If no date is mentioned, use ${today}. ` +
+                    `Return the result using the required structured JSON schema.`,
                 },
               ],
             },
@@ -128,8 +136,15 @@ export async function POST(request: Request) {
                             null,
                           ],
                         },
+                        eaten_at: {
+                          type: "string",
+                        },
                       },
-                      required: ["food", "preference"],
+                      required: [
+                        "food",
+                        "preference",
+                        "eaten_at",
+                      ],
                       additionalProperties: false,
                     },
                   },
@@ -145,7 +160,6 @@ export async function POST(request: Request) {
 
     if (!openAIResponse.ok) {
       const errorText = await openAIResponse.text();
-
       console.error("OpenAI API error:", errorText);
 
       return Response.json(

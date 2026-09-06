@@ -435,10 +435,10 @@ export default function Home() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({
-          text: aiText,
-        }),
-      });
+       body: JSON.stringify({
+  text: aiText,
+  today: getLocalDateString(new Date()),
+}),
 
       const result = await response.json();
 
@@ -717,7 +717,7 @@ export default function Home() {
             className="section-title"
             style={{ marginBottom: 0 }}
           >
-            Add Food
+            ✨ Add Food
           </h2>
 
           <label

@@ -17,6 +17,7 @@ type Alias = {
 type ParsedFood = {
   food: string;
   preference: string | null;
+  eaten_at: string;
 };
 
 type PreviewFood = {
@@ -24,6 +25,7 @@ type PreviewFood = {
   foodId: string | null;
   canonicalName: string | null;
   preference: string | null;
+  eatenAt: string;
   matched: boolean;
 };
 
@@ -49,6 +51,8 @@ export default function Home() {
 
   const [foods, setFoods] = useState<Food[]>([]);
   const [aliases, setAliases] = useState<Alias[]>([]);
+
+  const [manualMode, setManualMode] = useState(false);
 
   const [selectedFoodId, setSelectedFoodId] = useState("");
   const [preference, setPreference] = useState("");
@@ -77,6 +81,14 @@ export default function Home() {
     return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
+    });
+  }
+
+  function formatReviewDate(dateString: string) {
+    return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   }
 
@@ -188,7 +200,7 @@ export default function Home() {
 
     const { data: exposures, error: exposureError } = await supabase
       .from("food_exposures")
-      .select("id, food_id, eaten_at")
+      .select("id, food_id, eaten_at, created_at")
       .eq("baby_id", currentBabyId)
       .gte("eaten_at", cutoff)
       .in("food_id", ironFoodIds)
@@ -482,6 +494,7 @@ export default function Home() {
           foodId: match?.id ?? null,
           canonicalName: match?.name ?? null,
           preference: parsed.preference,
+          eatenAt: parsed.eaten_at,
           matched: Boolean(match),
         };
       });
@@ -531,6 +544,7 @@ export default function Home() {
       food_id: item.foodId,
       preference: item.preference,
       notes: null,
+      eaten_at: item.eatenAt,
       recorded_by: user.id,
     }));
 
@@ -689,230 +703,297 @@ export default function Home() {
       </section>
 
       <section className="card">
-        <h2 className="section-title">
-          ✨ Add Food
-        </h2>
-
-        <p className="muted">
-          Tell me what Thea ate in your own words.
-          Nothing is saved until you review it.
-        </p>
-
-        <textarea
-          className="textarea-field"
-          value={aiText}
-          onChange={(e) => {
-            setAiText(e.target.value);
-            setAiPreview([]);
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "16px",
+            flexWrap: "wrap",
+            marginBottom: "18px",
           }}
-          maxLength={1000}
-          placeholder="Example: Thea had banana, Greek yogurt, and peanut butter. She loved the banana."
-        />
-
-        <button
-          className="primary-button"
-          onClick={parseAiEntry}
-          disabled={parsingAi}
         >
-          {parsingAi
-            ? "Understanding..."
-            : "Review entry"}
-        </button>
+          <h2
+            className="section-title"
+            style={{ marginBottom: 0 }}
+          >
+            Add Food
+          </h2>
 
-        {aiPreview.length > 0 && (
-          <div style={{ marginTop: "24px" }}>
-            <h3
-              style={{
-                fontFamily:
-                  'Georgia, "Times New Roman", serif',
-                fontSize: "22px",
-                marginTop: 0,
-                marginBottom: "14px",
-              }}
-            >
-              Review foods
-            </h3>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "9px",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "14px",
+            }}
+          >
+            <span>Add Food Manually</span>
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
+            <input
+              type="checkbox"
+              checked={manualMode}
+              onChange={(e) => {
+                setManualMode(e.target.checked);
+                setMessage("");
               }}
+              style={{
+                width: "18px",
+                height: "18px",
+                cursor: "pointer",
+              }}
+            />
+          </label>
+        </div>
+
+        {!manualMode ? (
+          <>
+            <p className="muted">
+              Tell me what Thea ate in your own words.
+              Nothing is saved until you review it.
+            </p>
+
+            <textarea
+              className="textarea-field"
+              value={aiText}
+              onChange={(e) => {
+                setAiText(e.target.value);
+                setAiPreview([]);
+              }}
+              maxLength={1000}
+              placeholder="Example: Yesterday Thea had banana and Greek yogurt. She loved the banana."
+            />
+
+            <button
+              className="primary-button"
+              onClick={parseAiEntry}
+              disabled={parsingAi}
             >
-              {aiPreview.map((item, index) => (
-                <div
-                  key={`${item.inputName}-${index}`}
+              {parsingAi
+                ? "Understanding..."
+                : "Review entry"}
+            </button>
+
+            {aiPreview.length > 0 && (
+              <div style={{ marginTop: "24px" }}>
+                <h3
                   style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: "14px",
-                    padding: "14px",
-                    background: "white",
+                    fontFamily:
+                      'Georgia, "Times New Roman", serif',
+                    fontSize: "22px",
+                    marginTop: 0,
+                    marginBottom: "14px",
                   }}
                 >
-                  {item.matched ? (
-                    <>
-                      <strong>{item.canonicalName}</strong>
+                  Review foods
+                </h3>
 
-                      {item.preference && (
-                        <p style={{ margin: "8px 0 0" }}>
-                          Preference:{" "}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  {aiPreview.map((item, index) => (
+                    <div
+                      key={`${item.inputName}-${index}`}
+                      style={{
+                        border:
+                          "1px solid var(--border)",
+                        borderRadius: "14px",
+                        padding: "14px",
+                        background: "white",
+                      }}
+                    >
+                      {item.matched ? (
+                        <>
                           <strong>
-                            {getPreferenceLabel(item.preference)}
+                            {item.canonicalName}
                           </strong>
-                        </p>
+
+                          {item.preference && (
+                            <p
+                              style={{
+                                margin: "8px 0 0",
+                              }}
+                            >
+                              Preference:{" "}
+                              <strong>
+                                {getPreferenceLabel(
+                                  item.preference
+                                )}
+                              </strong>
+                            </p>
+                          )}
+
+                          <p
+                            className="muted"
+                            style={{
+                              margin: "8px 0 0",
+                            }}
+                          >
+                            Date:{" "}
+                            {formatReviewDate(
+                              item.eatenAt
+                            )}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <strong>
+                            ⚠️ {item.inputName}
+                          </strong>
+
+                          <p
+                            className="muted"
+                            style={{
+                              margin: "8px 0 0",
+                            }}
+                          >
+                            I couldn&apos;t match this
+                            to a food in Thea&apos;s
+                            library.
+                          </p>
+                        </>
                       )}
-                    </>
-                  ) : (
-                    <>
-                      <strong>
-                        ⚠️ {item.inputName}
-                      </strong>
-
-                      <p
-                        className="muted"
-                        style={{
-                          margin: "8px 0 0",
-                        }}
-                      >
-                        I couldn&apos;t match this to a food in
-                        Thea&apos;s library.
-                      </p>
-                    </>
-                  )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {aiPreview.some(
-              (item) => !item.matched
-            ) && (
-              <p
-                className="message"
-                style={{ marginTop: "14px" }}
-              >
-                Nothing will be saved until all foods can be
-                matched.
-              </p>
+                {aiPreview.some(
+                  (item) => !item.matched
+                ) && (
+                  <p
+                    className="message"
+                    style={{ marginTop: "14px" }}
+                  >
+                    Nothing will be saved until all
+                    foods can be matched.
+                  </p>
+                )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap",
+                    marginTop: "18px",
+                  }}
+                >
+                  <button
+                    className="primary-button"
+                    onClick={saveAiFoods}
+                    disabled={
+                      savingAi ||
+                      aiPreview.some(
+                        (item) => !item.matched
+                      )
+                    }
+                  >
+                    {savingAi
+                      ? "Saving..."
+                      : "Save foods"}
+                  </button>
+
+                  <button
+                    className="secondary-button"
+                    onClick={() =>
+                      setAiPreview([])
+                    }
+                    disabled={savingAi}
+                  >
+                    Edit entry
+                  </button>
+                </div>
+              </div>
             )}
+          </>
+        ) : (
+          <>
+            <label className="label">
+              Food
 
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                flexWrap: "wrap",
-                marginTop: "18px",
-              }}
-            >
-              <button
-                className="primary-button"
-                onClick={saveAiFoods}
-                disabled={
-                  savingAi ||
-                  aiPreview.some(
-                    (item) => !item.matched
-                  )
+              <select
+                className="select-field"
+                value={selectedFoodId}
+                onChange={(e) =>
+                  setSelectedFoodId(e.target.value)
                 }
               >
-                {savingAi ? "Saving..." : "Save foods"}
-              </button>
+                <option value="">
+                  Choose a food
+                </option>
 
-              <button
-                className="secondary-button"
-                onClick={() => setAiPreview([])}
-                disabled={savingAi}
+                {dropdownFoods.map((food) => (
+                  <option
+                    key={food.id}
+                    value={food.id}
+                  >
+                    {food.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="label">
+              Preference
+
+              <select
+                className="select-field"
+                value={preference}
+                onChange={(e) =>
+                  setPreference(e.target.value)
+                }
               >
-                Edit entry
-              </button>
-            </div>
-          </div>
+                <option value="">
+                  Not recorded
+                </option>
+                <option value="loved">
+                  Loved ❤️
+                </option>
+                <option value="liked">
+                  Liked 🙂
+                </option>
+                <option value="neutral">
+                  Neutral 😐
+                </option>
+                <option value="disliked">
+                  Didn&apos;t like 🙅‍♀️
+                </option>
+              </select>
+            </label>
+
+            <label className="label">
+              Notes
+
+              <textarea
+                className="textarea-field"
+                value={notes}
+                onChange={(e) =>
+                  setNotes(e.target.value)
+                }
+                placeholder="Optional notes"
+              />
+            </label>
+
+            <button
+              className="primary-button"
+              onClick={saveFoodExposure}
+              disabled={savingFood}
+            >
+              {savingFood
+                ? "Saving..."
+                : "Save food"}
+            </button>
+          </>
         )}
 
         {message && (
           <p className="message">{message}</p>
         )}
-      </section>
-
-      <section className="card">
-        <h2 className="section-title">
-          🍓 Log Food Manually
-        </h2>
-
-        <label className="label">
-          Food
-
-          <select
-            className="select-field"
-            value={selectedFoodId}
-            onChange={(e) =>
-              setSelectedFoodId(e.target.value)
-            }
-          >
-            <option value="">
-              Choose a food
-            </option>
-
-            {dropdownFoods.map((food) => (
-              <option
-                key={food.id}
-                value={food.id}
-              >
-                {food.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="label">
-          Preference
-
-          <select
-            className="select-field"
-            value={preference}
-            onChange={(e) =>
-              setPreference(e.target.value)
-            }
-          >
-            <option value="">
-              Not recorded
-            </option>
-            <option value="loved">
-              Loved ❤️
-            </option>
-            <option value="liked">
-              Liked 🙂
-            </option>
-            <option value="neutral">
-              Neutral 😐
-            </option>
-            <option value="disliked">
-              Didn&apos;t like 🙅‍♀️
-            </option>
-          </select>
-        </label>
-
-        <label className="label">
-          Notes
-
-          <textarea
-            className="textarea-field"
-            value={notes}
-            onChange={(e) =>
-              setNotes(e.target.value)
-            }
-            placeholder="Optional notes"
-          />
-        </label>
-
-        <button
-          className="primary-button"
-          onClick={saveFoodExposure}
-          disabled={savingFood}
-        >
-          {savingFood
-            ? "Saving..."
-            : "Save food"}
-        </button>
       </section>
 
       <section className="card soft">
@@ -924,8 +1005,8 @@ export default function Home() {
           className="muted"
           style={{ marginBottom: 0 }}
         >
-          At least one safe food, no more than one new food,
-          with repeat exposure encouraged.
+          At least one safe food, no more than one
+          new food, with repeat exposure encouraged.
         </p>
       </section>
 
@@ -935,7 +1016,8 @@ export default function Home() {
         </h2>
 
         <p className="muted">
-          Thea&apos;s iron-rich foods over the past 7 days.
+          Thea&apos;s iron-rich foods over the past
+          7 days.
         </p>
 
         <div
@@ -952,7 +1034,9 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() => setIronView("calendar")}
+            onClick={() =>
+              setIronView("calendar")
+            }
           >
             📅 Calendar
           </button>
@@ -963,7 +1047,9 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() => setIronView("list")}
+            onClick={() =>
+              setIronView("list")
+            }
           >
             🫘 Food List
           </button>
@@ -983,7 +1069,8 @@ export default function Home() {
                 key={day.dateString}
                 style={{
                   background: "white",
-                  border: "1px solid var(--border)",
+                  border:
+                    "1px solid var(--border)",
                   borderRadius: "14px",
                   padding: "14px 8px",
                   textAlign: "center",
@@ -1021,7 +1108,9 @@ export default function Home() {
 
                 <span
                   className="muted"
-                  style={{ fontSize: "12px" }}
+                  style={{
+                    fontSize: "12px",
+                  }}
                 >
                   {day.hadIron
                     ? "Iron-rich"
@@ -1039,7 +1128,8 @@ export default function Home() {
                 className="muted"
                 style={{ marginBottom: 0 }}
               >
-                No iron-rich foods recorded in the past 7 days.
+                No iron-rich foods recorded in the
+                past 7 days.
               </p>
             ) : (
               <div
@@ -1049,35 +1139,40 @@ export default function Home() {
                   gap: "10px",
                 }}
               >
-                {ironExposures.map((exposure) => (
-                  <div
-                    key={exposure.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "16px",
-                      paddingBottom: "10px",
-                      borderBottom:
-                        "1px solid var(--border)",
-                    }}
-                  >
-                    <strong>
-                      {exposure.foodName}
-                    </strong>
-
-                    <span
-                      className="muted"
+                {ironExposures.map(
+                  (exposure) => (
+                    <div
+                      key={exposure.id}
                       style={{
-                        whiteSpace: "nowrap",
+                        display: "flex",
+                        justifyContent:
+                          "space-between",
+                        alignItems: "center",
+                        gap: "16px",
+                        paddingBottom:
+                          "10px",
+                        borderBottom:
+                          "1px solid var(--border)",
                       }}
                     >
-                      {formatShortDate(
-                        exposure.eatenAt
-                      )}
-                    </span>
-                  </div>
-                ))}
+                      <strong>
+                        {exposure.foodName}
+                      </strong>
+
+                      <span
+                        className="muted"
+                        style={{
+                          whiteSpace:
+                            "nowrap",
+                        }}
+                      >
+                        {formatShortDate(
+                          exposure.eatenAt
+                        )}
+                      </span>
+                    </div>
+                  )
+                )}
               </div>
             )}
           </>

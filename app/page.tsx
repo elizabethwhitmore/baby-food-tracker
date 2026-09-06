@@ -92,8 +92,8 @@ export default function Home() {
     });
   }
 
-  function getPreferenceLabel(preference: string | null) {
-    switch (preference) {
+  function getPreferenceLabel(value: string | null) {
+    switch (value) {
       case "loved":
         return "Loved ❤️";
       case "liked":
@@ -435,10 +435,11 @@ export default function Home() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-       body: JSON.stringify({
-  text: aiText,
-  today: getLocalDateString(new Date()),
-}),
+        body: JSON.stringify({
+          text: aiText,
+          today: getLocalDateString(new Date()),
+        }),
+      });
 
       const result = await response.json();
 
@@ -599,10 +600,7 @@ export default function Home() {
 
   if (!signedIn) {
     return (
-      <main
-        className="app-shell"
-        style={{ maxWidth: "460px" }}
-      >
+      <main className="app-shell" style={{ maxWidth: "460px" }}>
         <h1 className="page-title">
           Thea&apos;s Food Tracker
         </h1>
@@ -614,7 +612,6 @@ export default function Home() {
         <section className="card">
           <label className="label">
             Email
-
             <input
               className="field"
               type="email"
@@ -630,7 +627,6 @@ export default function Home() {
 
           <label className="label">
             Password
-
             <input
               className="field"
               type="password"
@@ -652,9 +648,7 @@ export default function Home() {
             {signingIn ? "Signing in..." : "Sign in"}
           </button>
 
-          {message && (
-            <p className="message">{message}</p>
-          )}
+          {message && <p className="message">{message}</p>}
         </section>
       </main>
     );
@@ -667,8 +661,7 @@ export default function Home() {
       </h1>
 
       <p className="page-subtitle">
-        A simple place to track foods, preferences, plants,
-        and allergens.
+        A simple place to track foods, preferences, plants, and allergens.
       </p>
 
       <nav className="nav-card">
@@ -686,18 +679,13 @@ export default function Home() {
       </nav>
 
       <section className="card green">
-        <h2 className="section-title">
-          🌱 This Week
-        </h2>
+        <h2 className="section-title">🌱 This Week</h2>
 
         <p className="big-number">
           {plantCount} / {plantGoal ?? 25}
         </p>
 
-        <p
-          className="muted"
-          style={{ marginBottom: 0 }}
-        >
+        <p className="muted" style={{ marginBottom: 0 }}>
           different plant types
         </p>
       </section>
@@ -771,9 +759,7 @@ export default function Home() {
               onClick={parseAiEntry}
               disabled={parsingAi}
             >
-              {parsingAi
-                ? "Understanding..."
-                : "Review entry"}
+              {parsingAi ? "Understanding..." : "Review entry"}
             </button>
 
             {aiPreview.length > 0 && (
@@ -801,8 +787,7 @@ export default function Home() {
                     <div
                       key={`${item.inputName}-${index}`}
                       style={{
-                        border:
-                          "1px solid var(--border)",
+                        border: "1px solid var(--border)",
                         borderRadius: "14px",
                         padding: "14px",
                         background: "white",
@@ -810,52 +795,34 @@ export default function Home() {
                     >
                       {item.matched ? (
                         <>
-                          <strong>
-                            {item.canonicalName}
-                          </strong>
+                          <strong>{item.canonicalName}</strong>
 
                           {item.preference && (
-                            <p
-                              style={{
-                                margin: "8px 0 0",
-                              }}
-                            >
+                            <p style={{ margin: "8px 0 0" }}>
                               Preference:{" "}
                               <strong>
-                                {getPreferenceLabel(
-                                  item.preference
-                                )}
+                                {getPreferenceLabel(item.preference)}
                               </strong>
                             </p>
                           )}
 
                           <p
                             className="muted"
-                            style={{
-                              margin: "8px 0 0",
-                            }}
+                            style={{ margin: "8px 0 0" }}
                           >
-                            Date:{" "}
-                            {formatReviewDate(
-                              item.eatenAt
-                            )}
+                            Date: {formatReviewDate(item.eatenAt)}
                           </p>
                         </>
                       ) : (
                         <>
-                          <strong>
-                            ⚠️ {item.inputName}
-                          </strong>
+                          <strong>⚠️ {item.inputName}</strong>
 
                           <p
                             className="muted"
-                            style={{
-                              margin: "8px 0 0",
-                            }}
+                            style={{ margin: "8px 0 0" }}
                           >
-                            I couldn&apos;t match this
-                            to a food in Thea&apos;s
-                            library.
+                            I couldn&apos;t match this to a food in
+                            Thea&apos;s library.
                           </p>
                         </>
                       )}
@@ -863,15 +830,12 @@ export default function Home() {
                   ))}
                 </div>
 
-                {aiPreview.some(
-                  (item) => !item.matched
-                ) && (
+                {aiPreview.some((item) => !item.matched) && (
                   <p
                     className="message"
                     style={{ marginTop: "14px" }}
                   >
-                    Nothing will be saved until all
-                    foods can be matched.
+                    Nothing will be saved until all foods can be matched.
                   </p>
                 )}
 
@@ -888,21 +852,15 @@ export default function Home() {
                     onClick={saveAiFoods}
                     disabled={
                       savingAi ||
-                      aiPreview.some(
-                        (item) => !item.matched
-                      )
+                      aiPreview.some((item) => !item.matched)
                     }
                   >
-                    {savingAi
-                      ? "Saving..."
-                      : "Save foods"}
+                    {savingAi ? "Saving..." : "Save foods"}
                   </button>
 
                   <button
                     className="secondary-button"
-                    onClick={() =>
-                      setAiPreview([])
-                    }
+                    onClick={() => setAiPreview([])}
                     disabled={savingAi}
                   >
                     Edit entry
@@ -919,19 +877,12 @@ export default function Home() {
               <select
                 className="select-field"
                 value={selectedFoodId}
-                onChange={(e) =>
-                  setSelectedFoodId(e.target.value)
-                }
+                onChange={(e) => setSelectedFoodId(e.target.value)}
               >
-                <option value="">
-                  Choose a food
-                </option>
+                <option value="">Choose a food</option>
 
                 {dropdownFoods.map((food) => (
-                  <option
-                    key={food.id}
-                    value={food.id}
-                  >
+                  <option key={food.id} value={food.id}>
                     {food.name}
                   </option>
                 ))}
@@ -944,22 +895,12 @@ export default function Home() {
               <select
                 className="select-field"
                 value={preference}
-                onChange={(e) =>
-                  setPreference(e.target.value)
-                }
+                onChange={(e) => setPreference(e.target.value)}
               >
-                <option value="">
-                  Not recorded
-                </option>
-                <option value="loved">
-                  Loved ❤️
-                </option>
-                <option value="liked">
-                  Liked 🙂
-                </option>
-                <option value="neutral">
-                  Neutral 😐
-                </option>
+                <option value="">Not recorded</option>
+                <option value="loved">Loved ❤️</option>
+                <option value="liked">Liked 🙂</option>
+                <option value="neutral">Neutral 😐</option>
                 <option value="disliked">
                   Didn&apos;t like 🙅‍♀️
                 </option>
@@ -972,9 +913,7 @@ export default function Home() {
               <textarea
                 className="textarea-field"
                 value={notes}
-                onChange={(e) =>
-                  setNotes(e.target.value)
-                }
+                onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional notes"
               />
             </label>
@@ -984,40 +923,28 @@ export default function Home() {
               onClick={saveFoodExposure}
               disabled={savingFood}
             >
-              {savingFood
-                ? "Saving..."
-                : "Save food"}
+              {savingFood ? "Saving..." : "Save food"}
             </button>
           </>
         )}
 
-        {message && (
-          <p className="message">{message}</p>
-        )}
+        {message && <p className="message">{message}</p>}
       </section>
 
       <section className="card soft">
-        <h2 className="section-title">
-          💡 Meal Ideas
-        </h2>
+        <h2 className="section-title">💡 Meal Ideas</h2>
 
-        <p
-          className="muted"
-          style={{ marginBottom: 0 }}
-        >
-          At least one safe food, no more than one
-          new food, with repeat exposure encouraged.
+        <p className="muted" style={{ marginBottom: 0 }}>
+          At least one safe food, no more than one new food, with repeat
+          exposure encouraged.
         </p>
       </section>
 
       <section className="card soft">
-        <h2 className="section-title">
-          🫘 Iron-Rich Foods
-        </h2>
+        <h2 className="section-title">🫘 Iron-Rich Foods</h2>
 
         <p className="muted">
-          Thea&apos;s iron-rich foods over the past
-          7 days.
+          Thea&apos;s iron-rich foods over the past 7 days.
         </p>
 
         <div
@@ -1034,9 +961,7 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() =>
-              setIronView("calendar")
-            }
+            onClick={() => setIronView("calendar")}
           >
             📅 Calendar
           </button>
@@ -1047,9 +972,7 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() =>
-              setIronView("list")
-            }
+            onClick={() => setIronView("list")}
           >
             🫘 Food List
           </button>
@@ -1069,8 +992,7 @@ export default function Home() {
                 key={day.dateString}
                 style={{
                   background: "white",
-                  border:
-                    "1px solid var(--border)",
+                  border: "1px solid var(--border)",
                   borderRadius: "14px",
                   padding: "14px 8px",
                   textAlign: "center",
@@ -1108,13 +1030,9 @@ export default function Home() {
 
                 <span
                   className="muted"
-                  style={{
-                    fontSize: "12px",
-                  }}
+                  style={{ fontSize: "12px" }}
                 >
-                  {day.hadIron
-                    ? "Iron-rich"
-                    : "None"}
+                  {day.hadIron ? "Iron-rich" : "None"}
                 </span>
               </div>
             ))}
@@ -1128,8 +1046,7 @@ export default function Home() {
                 className="muted"
                 style={{ marginBottom: 0 }}
               >
-                No iron-rich foods recorded in the
-                past 7 days.
+                No iron-rich foods recorded in the past 7 days.
               </p>
             ) : (
               <div
@@ -1139,40 +1056,28 @@ export default function Home() {
                   gap: "10px",
                 }}
               >
-                {ironExposures.map(
-                  (exposure) => (
-                    <div
-                      key={exposure.id}
-                      style={{
-                        display: "flex",
-                        justifyContent:
-                          "space-between",
-                        alignItems: "center",
-                        gap: "16px",
-                        paddingBottom:
-                          "10px",
-                        borderBottom:
-                          "1px solid var(--border)",
-                      }}
-                    >
-                      <strong>
-                        {exposure.foodName}
-                      </strong>
+                {ironExposures.map((exposure) => (
+                  <div
+                    key={exposure.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "16px",
+                      paddingBottom: "10px",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    <strong>{exposure.foodName}</strong>
 
-                      <span
-                        className="muted"
-                        style={{
-                          whiteSpace:
-                            "nowrap",
-                        }}
-                      >
-                        {formatShortDate(
-                          exposure.eatenAt
-                        )}
-                      </span>
-                    </div>
-                  )
-                )}
+                    <span
+                      className="muted"
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {formatShortDate(exposure.eatenAt)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </>

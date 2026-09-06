@@ -6,6 +6,25 @@ import { supabase } from "../lib/supabase";
 type Food = {
   id: string;
   name: string;
+  show_in_dropdown: boolean;
+};
+
+type Alias = {
+  alias: string;
+  food_id: string;
+};
+
+type ParsedFood = {
+  food: string;
+  preference: string | null;
+};
+
+type PreviewFood = {
+  inputName: string;
+  foodId: string | null;
+  canonicalName: string | null;
+  preference: string | null;
+  matched: boolean;
 };
 
 type IronExposure = {
@@ -29,9 +48,16 @@ export default function Home() {
   const [ironView, setIronView] = useState<IronView>("calendar");
 
   const [foods, setFoods] = useState<Food[]>([]);
+  const [aliases, setAliases] = useState<Alias[]>([]);
+
   const [selectedFoodId, setSelectedFoodId] = useState("");
   const [preference, setPreference] = useState("");
   const [notes, setNotes] = useState("");
+
+  const [aiText, setAiText] = useState("");
+  const [aiPreview, setAiPreview] = useState<PreviewFood[]>([]);
+  const [parsingAi, setParsingAi] = useState(false);
+  const [savingAi, setSavingAi] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
@@ -52,6 +78,29 @@ export default function Home() {
       month: "short",
       day: "numeric",
     });
+  }
+
+  function getPreferenceLabel(preference: string | null) {
+    switch (preference) {
+      case "loved":
+        return "Loved ❤️";
+      case "liked":
+        return "Liked 🙂";
+      case "neutral":
+        return "Neutral 😐";
+      case "disliked":
+        return "Didn't like 🙅‍♀️";
+      default:
+        return "Not recorded";
+    }
+  }
+
+  function normalizeFoodName(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, "")
+      .replace(/\s+/g, " ");
   }
 
   function getStartOfWeek() {
@@ -197,19 +246,28 @@ export default function Home() {
     await loadIronExposures(baby.id);
   }
 
-  async function loadFoods() {
-    const { data, error } = await supabase
+  async function loadFoodsAndAliases() {
+    const { data: foodData, error: foodError } = await supabase
       .from("foods")
-      .select("id, name")
-      .eq("show_in_dropdown", true)
+      .select("id, name, show_in_dropdown")
       .order("name");
 
-    if (error) {
-      setMessage(error.message);
+    if (foodError) {
+      setMessage(foodError.message);
       return;
     }
 
-    setFoods(data ?? []);
+    const { data: aliasData, error: aliasError } = await supabase
+      .from("food_aliases")
+      .select("alias, food_id");
+
+    if (aliasError) {
+      setMessage(aliasError.message);
+      return;
+    }
+
+    setFoods((foodData ?? []) as Food[]);
+    setAliases((aliasData ?? []) as Alias[]);
   }
 
   useEffect(() => {
@@ -228,7 +286,7 @@ export default function Home() {
       if (session) {
         setSignedIn(true);
         await loadBabyData();
-        await loadFoods();
+        await loadFoodsAndAliases();
       }
 
       setLoading(false);
@@ -236,6 +294,10 @@ export default function Home() {
 
     checkSession();
   }, []);
+
+  const dropdownFoods = useMemo(() => {
+    return foods.filter((food) => food.show_in_dropdown);
+  }, [foods]);
 
   const lastSevenDays = useMemo(() => {
     const days = [];
@@ -284,7 +346,7 @@ export default function Home() {
 
     setSignedIn(true);
     await loadBabyData();
-    await loadFoods();
+    await loadFoodsAndAliases();
     setSigningIn(false);
   }
 
@@ -334,6 +396,165 @@ export default function Home() {
     setSavingFood(false);
   }
 
+  async function parseAiEntry() {
+    setMessage("");
+    setAiPreview([]);
+
+    if (!aiText.trim()) {
+      setMessage("Type what Thea ate first.");
+      return;
+    }
+
+    setParsingAi(true);
+
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        setMessage("Your sign-in session could not be found.");
+        return;
+      }
+
+      const response = await fetch("/api/parse-food", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          text: aiText,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(
+          result.error ?? "Could not understand the food entry."
+        );
+        return;
+      }
+
+      const parsedFoods = (result.foods ?? []) as ParsedFood[];
+
+      if (parsedFoods.length === 0) {
+        setMessage(
+          "I couldn't find any foods Thea ate in that entry."
+        );
+        return;
+      }
+
+      const canonicalMap = new Map(
+        foods.map((food) => [
+          normalizeFoodName(food.name),
+          food,
+        ])
+      );
+
+      const foodById = new Map(
+        foods.map((food) => [food.id, food])
+      );
+
+      const aliasMap = new Map<string, Food>();
+
+      aliases.forEach((alias) => {
+        const matchingFood = foodById.get(alias.food_id);
+
+        if (matchingFood) {
+          aliasMap.set(
+            normalizeFoodName(alias.alias),
+            matchingFood
+          );
+        }
+      });
+
+      const preview: PreviewFood[] = parsedFoods.map((parsed) => {
+        const normalized = normalizeFoodName(parsed.food);
+
+        const canonicalMatch = canonicalMap.get(normalized);
+        const aliasMatch = aliasMap.get(normalized);
+        const match = canonicalMatch ?? aliasMatch ?? null;
+
+        return {
+          inputName: parsed.food,
+          foodId: match?.id ?? null,
+          canonicalName: match?.name ?? null,
+          preference: parsed.preference,
+          matched: Boolean(match),
+        };
+      });
+
+      setAiPreview(preview);
+    } catch {
+      setMessage(
+        "Something went wrong while understanding the food entry."
+      );
+    } finally {
+      setParsingAi(false);
+    }
+  }
+
+  async function saveAiFoods() {
+    setMessage("");
+
+    if (aiPreview.length === 0) {
+      setMessage("There is nothing to save.");
+      return;
+    }
+
+    const unmatched = aiPreview.filter((item) => !item.matched);
+
+    if (unmatched.length > 0) {
+      setMessage(
+        "One or more foods could not be matched to the food library. Nothing has been saved yet."
+      );
+      return;
+    }
+
+    setSavingAi(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setMessage("Could not identify the signed-in user.");
+      setSavingAi(false);
+      return;
+    }
+
+    const rows = aiPreview.map((item) => ({
+      baby_id: babyId,
+      food_id: item.foodId,
+      preference: item.preference,
+      notes: null,
+      recorded_by: user.id,
+    }));
+
+    const { error } = await supabase
+      .from("food_exposures")
+      .insert(rows);
+
+    if (error) {
+      setMessage(error.message);
+      setSavingAi(false);
+      return;
+    }
+
+    setAiText("");
+    setAiPreview([]);
+
+    await loadPlantCount(babyId);
+    await loadIronExposures(babyId);
+
+    setMessage("Foods saved! ✓");
+    setSavingAi(false);
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
 
@@ -344,6 +565,12 @@ export default function Home() {
     setPlantCount(0);
     setIronExposures([]);
     setFoods([]);
+    setAliases([]);
+    setAiText("");
+    setAiPreview([]);
+    setSelectedFoodId("");
+    setPreference("");
+    setNotes("");
     setEmail("");
     setPassword("");
     setMessage("");
@@ -359,8 +586,13 @@ export default function Home() {
 
   if (!signedIn) {
     return (
-      <main className="app-shell" style={{ maxWidth: "460px" }}>
-        <h1 className="page-title">Thea&apos;s Food Tracker</h1>
+      <main
+        className="app-shell"
+        style={{ maxWidth: "460px" }}
+      >
+        <h1 className="page-title">
+          Thea&apos;s Food Tracker
+        </h1>
 
         <p className="page-subtitle">
           Sign in to track Thea&apos;s food journey.
@@ -407,7 +639,9 @@ export default function Home() {
             {signingIn ? "Signing in..." : "Sign in"}
           </button>
 
-          {message && <p className="message">{message}</p>}
+          {message && (
+            <p className="message">{message}</p>
+          )}
         </section>
       </main>
     );
@@ -420,7 +654,8 @@ export default function Home() {
       </h1>
 
       <p className="page-subtitle">
-        A simple place to track foods, preferences, plants, and allergens.
+        A simple place to track foods, preferences, plants,
+        and allergens.
       </p>
 
       <nav className="nav-card">
@@ -438,19 +673,215 @@ export default function Home() {
       </nav>
 
       <section className="card green">
-        <h2 className="section-title">🌱 This Week</h2>
+        <h2 className="section-title">
+          🌱 This Week
+        </h2>
 
         <p className="big-number">
           {plantCount} / {plantGoal ?? 25}
         </p>
 
-        <p className="muted" style={{ marginBottom: 0 }}>
+        <p
+          className="muted"
+          style={{ marginBottom: 0 }}
+        >
           different plant types
         </p>
       </section>
 
       <section className="card">
-        <h2 className="section-title">🍓 Log Food</h2>
+        <h2 className="section-title">
+          ✨ Quick Add with AI
+        </h2>
+
+        <p className="muted">
+          Tell me what Thea ate in your own words.
+          Nothing is saved until you review it.
+        </p>
+
+        <textarea
+          className="textarea-field"
+          value={aiText}
+          onChange={(e) => {
+            setAiText(e.target.value);
+            setAiPreview([]);
+          }}
+          maxLength={1000}
+          placeholder="Example: Thea had banana, Greek yogurt, and peanut butter. She loved the banana."
+        />
+
+        <button
+          className="primary-button"
+          onClick={parseAiEntry}
+          disabled={parsingAi}
+        >
+          {parsingAi
+            ? "Understanding..."
+            : "Review entry"}
+        </button>
+
+        {aiPreview.length > 0 && (
+          <div style={{ marginTop: "24px" }}>
+            <h3
+              style={{
+                fontFamily:
+                  'Georgia, "Times New Roman", serif',
+                fontSize: "22px",
+                marginTop: 0,
+                marginBottom: "14px",
+              }}
+            >
+              Review foods
+            </h3>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              {aiPreview.map((item, index) => (
+                <div
+                  key={`${item.inputName}-${index}`}
+                  style={{
+                    border:
+                      "1px solid var(--border)",
+                    borderRadius: "14px",
+                    padding: "14px",
+                    background: "white",
+                  }}
+                >
+                  {item.matched ? (
+                    <>
+                      <strong>
+                        {item.canonicalName}
+                      </strong>
+
+                      {normalizeFoodName(
+                        item.inputName
+                      ) !==
+                        normalizeFoodName(
+                          item.canonicalName ?? ""
+                        ) && (
+                        <p
+                          className="muted"
+                          style={{
+                            margin:
+                              "6px 0 0",
+                          }}
+                        >
+                          Understood from: “
+                          {item.inputName}”
+                        </p>
+                      )}
+
+                      {item.preference ? (
+                        <p
+                          style={{
+                            margin:
+                              "8px 0 0",
+                          }}
+                        >
+                          Preference:{" "}
+                          <strong>
+                            {getPreferenceLabel(
+                              item.preference
+                            )}
+                          </strong>
+                        </p>
+                      ) : (
+                        <p
+                          className="muted"
+                          style={{
+                            margin:
+                              "8px 0 0",
+                          }}
+                        >
+                          Preference not recorded
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <strong>
+                        ⚠️ {item.inputName}
+                      </strong>
+
+                      <p
+                        className="muted"
+                        style={{
+                          margin:
+                            "8px 0 0",
+                        }}
+                      >
+                        I couldn&apos;t match this
+                        to a food in Thea&apos;s
+                        library.
+                      </p>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {aiPreview.some(
+              (item) => !item.matched
+            ) && (
+              <p
+                className="message"
+                style={{ marginTop: "14px" }}
+              >
+                Nothing will be saved until all
+                foods can be matched.
+              </p>
+            )}
+
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                flexWrap: "wrap",
+                marginTop: "18px",
+              }}
+            >
+              <button
+                className="primary-button"
+                onClick={saveAiFoods}
+                disabled={
+                  savingAi ||
+                  aiPreview.some(
+                    (item) => !item.matched
+                  )
+                }
+              >
+                {savingAi
+                  ? "Saving..."
+                  : "Save foods"}
+              </button>
+
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  setAiPreview([])
+                }
+                disabled={savingAi}
+              >
+                Edit entry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {message && (
+          <p className="message">{message}</p>
+        )}
+      </section>
+
+      <section className="card">
+        <h2 className="section-title">
+          🍓 Log Food Manually
+        </h2>
 
         <label className="label">
           Food
@@ -458,12 +889,19 @@ export default function Home() {
           <select
             className="select-field"
             value={selectedFoodId}
-            onChange={(e) => setSelectedFoodId(e.target.value)}
+            onChange={(e) =>
+              setSelectedFoodId(e.target.value)
+            }
           >
-            <option value="">Choose a food</option>
+            <option value="">
+              Choose a food
+            </option>
 
-            {foods.map((food) => (
-              <option key={food.id} value={food.id}>
+            {dropdownFoods.map((food) => (
+              <option
+                key={food.id}
+                value={food.id}
+              >
                 {food.name}
               </option>
             ))}
@@ -476,13 +914,25 @@ export default function Home() {
           <select
             className="select-field"
             value={preference}
-            onChange={(e) => setPreference(e.target.value)}
+            onChange={(e) =>
+              setPreference(e.target.value)
+            }
           >
-            <option value="">Not recorded</option>
-            <option value="loved">Loved ❤️</option>
-            <option value="liked">Liked 🙂</option>
-            <option value="neutral">Neutral 😐</option>
-            <option value="disliked">Didn't like 🙅‍♀️</option>
+            <option value="">
+              Not recorded
+            </option>
+            <option value="loved">
+              Loved ❤️
+            </option>
+            <option value="liked">
+              Liked 🙂
+            </option>
+            <option value="neutral">
+              Neutral 😐
+            </option>
+            <option value="disliked">
+              Didn&apos;t like 🙅‍♀️
+            </option>
           </select>
         </label>
 
@@ -492,7 +942,9 @@ export default function Home() {
           <textarea
             className="textarea-field"
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) =>
+              setNotes(e.target.value)
+            }
             placeholder="Optional notes"
           />
         </label>
@@ -502,26 +954,34 @@ export default function Home() {
           onClick={saveFoodExposure}
           disabled={savingFood}
         >
-          {savingFood ? "Saving..." : "Save food"}
+          {savingFood
+            ? "Saving..."
+            : "Save food"}
         </button>
-
-        {message && <p className="message">{message}</p>}
       </section>
 
       <section className="card soft">
-        <h2 className="section-title">💡 Meal Ideas</h2>
+        <h2 className="section-title">
+          💡 Meal Ideas
+        </h2>
 
-        <p className="muted" style={{ marginBottom: 0 }}>
-          At least one safe food, no more than one new food, with repeat
-          exposure encouraged.
+        <p
+          className="muted"
+          style={{ marginBottom: 0 }}
+        >
+          At least one safe food, no more than one
+          new food, with repeat exposure encouraged.
         </p>
       </section>
 
       <section className="card soft">
-        <h2 className="section-title">🫘 Iron-Rich Foods</h2>
+        <h2 className="section-title">
+          🫘 Iron-Rich Foods
+        </h2>
 
         <p className="muted">
-          Thea&apos;s iron-rich foods over the past 7 days.
+          Thea&apos;s iron-rich foods over the past
+          7 days.
         </p>
 
         <div
@@ -538,7 +998,9 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() => setIronView("calendar")}
+            onClick={() =>
+              setIronView("calendar")
+            }
           >
             📅 Calendar
           </button>
@@ -549,7 +1011,9 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() => setIronView("list")}
+            onClick={() =>
+              setIronView("list")
+            }
           >
             🫘 Food List
           </button>
@@ -559,7 +1023,8 @@ export default function Home() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(82px, 1fr))",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(82px, 1fr))",
               gap: "10px",
             }}
           >
@@ -568,7 +1033,8 @@ export default function Home() {
                 key={day.dateString}
                 style={{
                   background: "white",
-                  border: "1px solid var(--border)",
+                  border:
+                    "1px solid var(--border)",
                   borderRadius: "14px",
                   padding: "14px 8px",
                   textAlign: "center",
@@ -615,7 +1081,9 @@ export default function Home() {
                     fontSize: "12px",
                   }}
                 >
-                  {day.hadIron ? "Iron-rich" : "None"}
+                  {day.hadIron
+                    ? "Iron-rich"
+                    : "None"}
                 </span>
               </div>
             ))}
@@ -625,8 +1093,12 @@ export default function Home() {
         {ironView === "list" && (
           <>
             {ironExposures.length === 0 ? (
-              <p className="muted" style={{ marginBottom: 0 }}>
-                No iron-rich foods recorded in the past 7 days.
+              <p
+                className="muted"
+                style={{ marginBottom: 0 }}
+              >
+                No iron-rich foods recorded in the
+                past 7 days.
               </p>
             ) : (
               <div
@@ -636,28 +1108,40 @@ export default function Home() {
                   gap: "10px",
                 }}
               >
-                {ironExposures.map((exposure) => (
-                  <div
-                    key={exposure.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "16px",
-                      paddingBottom: "10px",
-                      borderBottom: "1px solid var(--border)",
-                    }}
-                  >
-                    <strong>{exposure.foodName}</strong>
-
-                    <span
-                      className="muted"
-                      style={{ whiteSpace: "nowrap" }}
+                {ironExposures.map(
+                  (exposure) => (
+                    <div
+                      key={exposure.id}
+                      style={{
+                        display: "flex",
+                        justifyContent:
+                          "space-between",
+                        alignItems: "center",
+                        gap: "16px",
+                        paddingBottom:
+                          "10px",
+                        borderBottom:
+                          "1px solid var(--border)",
+                      }}
                     >
-                      {formatShortDate(exposure.eatenAt)}
-                    </span>
-                  </div>
-                ))}
+                      <strong>
+                        {exposure.foodName}
+                      </strong>
+
+                      <span
+                        className="muted"
+                        style={{
+                          whiteSpace:
+                            "nowrap",
+                        }}
+                      >
+                        {formatShortDate(
+                          exposure.eatenAt
+                        )}
+                      </span>
+                    </div>
+                  )
+                )}
               </div>
             )}
           </>

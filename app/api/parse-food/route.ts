@@ -1,11 +1,56 @@
+import { createClient } from "@supabase/supabase-js";
+
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get("authorization");
+
+    if (!authHeader?.startsWith("Bearer ")) {
+      return Response.json(
+        { error: "You must be signed in." },
+        { status: 401 }
+      );
+    }
+
+    const accessToken = authHeader.replace("Bearer ", "");
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey =
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      return Response.json(
+        { error: "Supabase is not configured." },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(accessToken);
+
+    if (authError || !user) {
+      return Response.json(
+        { error: "Your sign-in session is not valid." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const text = body.text;
 
     if (!text || typeof text !== "string") {
       return Response.json(
         { error: "Please provide some food text." },
+        { status: 400 }
+      );
+    }
+
+    if (text.length > 1000) {
+      return Response.json(
+        { error: "Please keep the food entry under 1,000 characters." },
         { status: 400 }
       );
     }
@@ -38,7 +83,11 @@ export async function POST(request: Request) {
                   text:
                     "You extract food information for a baby food tracker. " +
                     "The baby's name is Thea. References to 'Thea' or 'she' refer to Thea. " +
-                    "Extract only food-related information. Do not invent foods or preferences. " +
+                    "Extract only foods that Thea actually ate. " +
+                    "Do not invent foods or preferences. " +
+                    "Do not record preparation method, amount, feeding method, or whether a food is new or repeated. " +
+                    "If a preference is clearly stated for a specific food, use loved, liked, neutral, or disliked. " +
+                    "Otherwise return null for that food's preference. " +
                     "Return the result using the required structured JSON schema.",
                 },
               ],

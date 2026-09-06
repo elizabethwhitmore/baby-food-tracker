@@ -8,6 +8,12 @@ type Food = {
   name: string;
 };
 
+type IronExposure = {
+  id: string;
+  foodName: string;
+  eatenAt: string;
+};
+
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +22,7 @@ export default function Home() {
   const [babyName, setBabyName] = useState("");
   const [plantGoal, setPlantGoal] = useState<number | null>(null);
   const [plantCount, setPlantCount] = useState(0);
+  const [ironExposures, setIronExposures] = useState<IronExposure[]>([]);
 
   const [foods, setFoods] = useState<Food[]>([]);
   const [selectedFoodId, setSelectedFoodId] = useState("");
@@ -28,6 +35,21 @@ export default function Home() {
   const [signedIn, setSignedIn] = useState(false);
   const [message, setMessage] = useState("");
 
+  function getLocalDateString(date: Date) {
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
+  function formatDate(dateString: string) {
+    return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
   function getStartOfWeek() {
     const today = new Date();
     const day = today.getDay();
@@ -36,11 +58,13 @@ export default function Home() {
     const monday = new Date(today);
     monday.setDate(today.getDate() - daysSinceMonday);
 
-    return [
-      monday.getFullYear(),
-      String(monday.getMonth() + 1).padStart(2, "0"),
-      String(monday.getDate()).padStart(2, "0"),
-    ].join("-");
+    return getLocalDateString(monday);
+  }
+
+  function getFourteenDayCutoff() {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 13);
+    return getLocalDateString(cutoff);
   }
 
   async function loadPlantCount(currentBabyId: string) {
@@ -83,6 +107,57 @@ export default function Home() {
     setPlantCount(uniquePlants.size);
   }
 
+  async function loadIronExposures(currentBabyId: string) {
+    const cutoff = getFourteenDayCutoff();
+
+    const { data: ironFoods, error: ironFoodsError } = await supabase
+      .from("foods")
+      .select("id, name")
+      .eq("is_iron_rich", true);
+
+    if (ironFoodsError) {
+      setMessage(ironFoodsError.message);
+      return;
+    }
+
+    if (!ironFoods || ironFoods.length === 0) {
+      setIronExposures([]);
+      return;
+    }
+
+    const ironFoodIds = ironFoods.map((food) => food.id);
+
+    const ironFoodNameMap = new Map(
+      ironFoods.map((food) => [food.id, food.name])
+    );
+
+    const { data: exposures, error: exposureError } = await supabase
+      .from("food_exposures")
+      .select("id, food_id, eaten_at")
+      .eq("baby_id", currentBabyId)
+      .gte("eaten_at", cutoff)
+      .in("food_id", ironFoodIds)
+      .order("eaten_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (exposureError) {
+      setMessage(exposureError.message);
+      return;
+    }
+
+    const recentIronExposures: IronExposure[] = (exposures ?? []).map(
+      (exposure) => ({
+        id: exposure.id,
+        foodName:
+          ironFoodNameMap.get(exposure.food_id) ?? "Unknown food",
+        eatenAt: exposure.eaten_at,
+      })
+    );
+
+    setIronExposures(recentIronExposures);
+  }
+
   async function loadBabyData() {
     const { data: baby, error: babyError } = await supabase
       .from("babies")
@@ -112,7 +187,9 @@ export default function Home() {
     }
 
     setPlantGoal(settings.weekly_plant_goal);
+
     await loadPlantCount(baby.id);
+    await loadIronExposures(baby.id);
   }
 
   async function loadFoods() {
@@ -216,6 +293,7 @@ export default function Home() {
     setNotes("");
 
     await loadPlantCount(babyId);
+    await loadIronExposures(babyId);
 
     setMessage("Food saved! ✓");
     setSavingFood(false);
@@ -229,6 +307,7 @@ export default function Home() {
     setBabyName("");
     setPlantGoal(null);
     setPlantCount(0);
+    setIronExposures([]);
     setFoods([]);
     setEmail("");
     setPassword("");
@@ -333,6 +412,50 @@ export default function Home() {
         <p className="muted" style={{ marginBottom: 0 }}>
           different plant types
         </p>
+      </section>
+
+      <section className="card soft">
+        <h2 className="section-title">🫘 Iron-Rich Foods Recently</h2>
+
+        {ironExposures.length === 0 ? (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            No iron-rich foods recorded in the past 14 days.
+          </p>
+        ) : (
+          <>
+            <p className="muted">
+              Thea&apos;s 5 most recent iron-rich food exposures from the
+              past 14 days:
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              {ironExposures.map((exposure) => (
+                <div
+                  key={exposure.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "16px",
+                    paddingBottom: "10px",
+                    borderBottom: "1px solid var(--border)",
+                  }}
+                >
+                  <strong>{exposure.foodName}</strong>
+
+                  <span className="muted">
+                    {formatDate(exposure.eatenAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
       <section className="card">

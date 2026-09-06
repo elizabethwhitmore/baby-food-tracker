@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type Food = {
@@ -14,6 +14,8 @@ type IronExposure = {
   eatenAt: string;
 };
 
+type IronView = "calendar" | "list";
+
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +24,9 @@ export default function Home() {
   const [babyName, setBabyName] = useState("");
   const [plantGoal, setPlantGoal] = useState<number | null>(null);
   const [plantCount, setPlantCount] = useState(0);
+
   const [ironExposures, setIronExposures] = useState<IronExposure[]>([]);
+  const [ironView, setIronView] = useState<IronView>("calendar");
 
   const [foods, setFoods] = useState<Food[]>([]);
   const [selectedFoodId, setSelectedFoodId] = useState("");
@@ -43,7 +47,7 @@ export default function Home() {
     ].join("-");
   }
 
-  function formatDate(dateString: string) {
+  function formatShortDate(dateString: string) {
     return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -61,9 +65,11 @@ export default function Home() {
     return getLocalDateString(monday);
   }
 
-  function getFourteenDayCutoff() {
+  function getSevenDayCutoff() {
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 13);
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(cutoff.getDate() - 6);
+
     return getLocalDateString(cutoff);
   }
 
@@ -108,7 +114,7 @@ export default function Home() {
   }
 
   async function loadIronExposures(currentBabyId: string) {
-    const cutoff = getFourteenDayCutoff();
+    const cutoff = getSevenDayCutoff();
 
     const { data: ironFoods, error: ironFoodsError } = await supabase
       .from("foods")
@@ -138,8 +144,7 @@ export default function Home() {
       .gte("eaten_at", cutoff)
       .in("food_id", ironFoodIds)
       .order("eaten_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(5);
+      .order("created_at", { ascending: false });
 
     if (exposureError) {
       setMessage(exposureError.message);
@@ -231,6 +236,36 @@ export default function Home() {
 
     checkSession();
   }, []);
+
+  const lastSevenDays = useMemo(() => {
+    const days = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - i);
+
+      const dateString = getLocalDateString(date);
+
+      const hadIron = ironExposures.some(
+        (exposure) => exposure.eatenAt === dateString
+      );
+
+      days.push({
+        dateString,
+        weekday: date.toLocaleDateString("en-US", {
+          weekday: "short",
+        }),
+        dateLabel: date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+        hadIron,
+      });
+    }
+
+    return days;
+  }, [ironExposures]);
 
   async function signIn() {
     setSigningIn(true);
@@ -414,50 +449,6 @@ export default function Home() {
         </p>
       </section>
 
-      <section className="card soft">
-        <h2 className="section-title">🫘 Iron-Rich Foods Recently</h2>
-
-        {ironExposures.length === 0 ? (
-          <p className="muted" style={{ marginBottom: 0 }}>
-            No iron-rich foods recorded in the past 14 days.
-          </p>
-        ) : (
-          <>
-            <p className="muted">
-              Thea&apos;s 5 most recent iron-rich food exposures from the
-              past 14 days:
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-              }}
-            >
-              {ironExposures.map((exposure) => (
-                <div
-                  key={exposure.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "16px",
-                    paddingBottom: "10px",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  <strong>{exposure.foodName}</strong>
-
-                  <span className="muted">
-                    {formatDate(exposure.eatenAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
       <section className="card">
         <h2 className="section-title">🍓 Log Food</h2>
 
@@ -524,6 +515,153 @@ export default function Home() {
           At least one safe food, no more than one new food, with repeat
           exposure encouraged.
         </p>
+      </section>
+
+      <section className="card soft">
+        <h2 className="section-title">🫘 Iron-Rich Foods</h2>
+
+        <p className="muted">
+          Thea&apos;s iron-rich foods over the past 7 days.
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            flexWrap: "wrap",
+            marginBottom: "20px",
+          }}
+        >
+          <button
+            className={
+              ironView === "calendar"
+                ? "primary-button"
+                : "secondary-button"
+            }
+            onClick={() => setIronView("calendar")}
+          >
+            📅 Calendar
+          </button>
+
+          <button
+            className={
+              ironView === "list"
+                ? "primary-button"
+                : "secondary-button"
+            }
+            onClick={() => setIronView("list")}
+          >
+            🫘 Food List
+          </button>
+        </div>
+
+        {ironView === "calendar" && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(82px, 1fr))",
+              gap: "10px",
+            }}
+          >
+            {lastSevenDays.map((day) => (
+              <div
+                key={day.dateString}
+                style={{
+                  background: "white",
+                  border: "1px solid var(--border)",
+                  borderRadius: "14px",
+                  padding: "14px 8px",
+                  textAlign: "center",
+                }}
+              >
+                <strong
+                  style={{
+                    display: "block",
+                    marginBottom: "4px",
+                  }}
+                >
+                  {day.weekday}
+                </strong>
+
+                <span
+                  className="muted"
+                  style={{
+                    display: "block",
+                    fontSize: "14px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  {day.dateLabel}
+                </span>
+
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "25px",
+                    marginBottom: "5px",
+                  }}
+                  aria-label={
+                    day.hadIron
+                      ? "Iron-rich food recorded"
+                      : "No iron-rich food recorded"
+                  }
+                >
+                  {day.hadIron ? "✅" : "—"}
+                </span>
+
+                <span
+                  className="muted"
+                  style={{
+                    fontSize: "12px",
+                  }}
+                >
+                  {day.hadIron ? "Iron-rich" : "None"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {ironView === "list" && (
+          <>
+            {ironExposures.length === 0 ? (
+              <p className="muted" style={{ marginBottom: 0 }}>
+                No iron-rich foods recorded in the past 7 days.
+              </p>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                }}
+              >
+                {ironExposures.map((exposure) => (
+                  <div
+                    key={exposure.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "16px",
+                      paddingBottom: "10px",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    <strong>{exposure.foodName}</strong>
+
+                    <span
+                      className="muted"
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {formatShortDate(exposure.eatenAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </section>
 
       <button

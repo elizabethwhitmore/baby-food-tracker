@@ -1,5 +1,24 @@
 import { createClient } from "@supabase/supabase-js";
 
+function isValidDateString(value: unknown): value is string {
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value)
+  ) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -40,6 +59,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const text = body.text;
+    const clientToday = body.today;
 
     if (!text || typeof text !== "string") {
       return Response.json(
@@ -55,6 +75,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const today = isValidDateString(clientToday)
+      ? clientToday
+      : new Date().toISOString().slice(0, 10);
+
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -63,8 +87,6 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-
-    const today = new Date().toISOString().slice(0, 10);
 
     const openAIResponse = await fetch(
       "https://api.openai.com/v1/responses",
@@ -85,7 +107,7 @@ export async function POST(request: Request) {
                   text:
                     `You extract food information for a baby food tracker. ` +
                     `The baby's name is Thea. References to 'Thea' or 'she' refer to Thea. ` +
-                    `Today's date is ${today}. ` +
+                    `Today's local date is ${today}. ` +
                     `Extract only foods that Thea actually ate. ` +
                     `Do not invent foods or preferences. ` +
                     `Do not record preparation method, amount, feeding method, or whether a food is new or repeated. ` +
@@ -182,7 +204,25 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json(JSON.parse(outputText));
+    const parsed = JSON.parse(outputText);
+
+    if (!Array.isArray(parsed.foods)) {
+      return Response.json(
+        { error: "The parsed food response was not valid." },
+        { status: 500 }
+      );
+    }
+
+    for (const food of parsed.foods) {
+      if (!isValidDateString(food.eaten_at)) {
+        return Response.json(
+          { error: "The parsed food date was not valid." },
+          { status: 500 }
+        );
+      }
+    }
+
+    return Response.json(parsed);
   } catch (error) {
     console.error("parse-food error:", error);
 

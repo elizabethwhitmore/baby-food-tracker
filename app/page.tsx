@@ -91,7 +91,7 @@ export default function Home() {
       case "disliked":
         return "Didn't like 🙅‍♀️";
       default:
-        return "Not recorded";
+        return "";
     }
   }
 
@@ -203,8 +203,7 @@ export default function Home() {
     const recentIronExposures: IronExposure[] = (exposures ?? []).map(
       (exposure) => ({
         id: exposure.id,
-        foodName:
-          ironFoodNameMap.get(exposure.food_id) ?? "Unknown food",
+        foodName: ironFoodNameMap.get(exposure.food_id) ?? "Unknown food",
         eatenAt: exposure.eaten_at,
       })
     );
@@ -691,7 +690,7 @@ export default function Home() {
 
       <section className="card">
         <h2 className="section-title">
-          ✨ Quick Add with AI
+          ✨ Add Food
         </h2>
 
         <p className="muted">
@@ -745,8 +744,7 @@ export default function Home() {
                 <div
                   key={`${item.inputName}-${index}`}
                   style={{
-                    border:
-                      "1px solid var(--border)",
+                    border: "1px solid var(--border)",
                     borderRadius: "14px",
                     padding: "14px",
                     background: "white",
@@ -754,51 +752,14 @@ export default function Home() {
                 >
                   {item.matched ? (
                     <>
-                      <strong>
-                        {item.canonicalName}
-                      </strong>
+                      <strong>{item.canonicalName}</strong>
 
-                      {normalizeFoodName(
-                        item.inputName
-                      ) !==
-                        normalizeFoodName(
-                          item.canonicalName ?? ""
-                        ) && (
-                        <p
-                          className="muted"
-                          style={{
-                            margin:
-                              "6px 0 0",
-                          }}
-                        >
-                          Understood from: “
-                          {item.inputName}”
-                        </p>
-                      )}
-
-                      {item.preference ? (
-                        <p
-                          style={{
-                            margin:
-                              "8px 0 0",
-                          }}
-                        >
+                      {item.preference && (
+                        <p style={{ margin: "8px 0 0" }}>
                           Preference:{" "}
                           <strong>
-                            {getPreferenceLabel(
-                              item.preference
-                            )}
+                            {getPreferenceLabel(item.preference)}
                           </strong>
-                        </p>
-                      ) : (
-                        <p
-                          className="muted"
-                          style={{
-                            margin:
-                              "8px 0 0",
-                          }}
-                        >
-                          Preference not recorded
                         </p>
                       )}
                     </>
@@ -811,13 +772,11 @@ export default function Home() {
                       <p
                         className="muted"
                         style={{
-                          margin:
-                            "8px 0 0",
+                          margin: "8px 0 0",
                         }}
                       >
-                        I couldn&apos;t match this
-                        to a food in Thea&apos;s
-                        library.
+                        I couldn&apos;t match this to a food in
+                        Thea&apos;s library.
                       </p>
                     </>
                   )}
@@ -832,8 +791,8 @@ export default function Home() {
                 className="message"
                 style={{ marginTop: "14px" }}
               >
-                Nothing will be saved until all
-                foods can be matched.
+                Nothing will be saved until all foods can be
+                matched.
               </p>
             )}
 
@@ -855,16 +814,12 @@ export default function Home() {
                   )
                 }
               >
-                {savingAi
-                  ? "Saving..."
-                  : "Save foods"}
+                {savingAi ? "Saving..." : "Save foods"}
               </button>
 
               <button
                 className="secondary-button"
-                onClick={() =>
-                  setAiPreview([])
-                }
+                onClick={() => setAiPreview([])}
                 disabled={savingAi}
               >
                 Edit entry
@@ -969,8 +924,8 @@ export default function Home() {
           className="muted"
           style={{ marginBottom: 0 }}
         >
-          At least one safe food, no more than one
-          new food, with repeat exposure encouraged.
+          At least one safe food, no more than one new food,
+          with repeat exposure encouraged.
         </p>
       </section>
 
@@ -980,8 +935,7 @@ export default function Home() {
         </h2>
 
         <p className="muted">
-          Thea&apos;s iron-rich foods over the past
-          7 days.
+          Thea&apos;s iron-rich foods over the past 7 days.
         </p>
 
         <div
@@ -998,9 +952,7 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() =>
-              setIronView("calendar")
-            }
+            onClick={() => setIronView("calendar")}
           >
             📅 Calendar
           </button>
@@ -1011,9 +963,7 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() =>
-              setIronView("list")
-            }
+            onClick={() => setIronView("list")}
           >
             🫘 Food List
           </button>
@@ -1033,8 +983,7 @@ export default function Home() {
                 key={day.dateString}
                 style={{
                   background: "white",
-                  border:
-                    "1px solid var(--border)",
+                  border: "1px solid var(--border)",
                   borderRadius: "14px",
                   padding: "14px 8px",
                   textAlign: "center",
@@ -1066,20 +1015,13 @@ export default function Home() {
                     fontSize: "25px",
                     marginBottom: "5px",
                   }}
-                  aria-label={
-                    day.hadIron
-                      ? "Iron-rich food recorded"
-                      : "No iron-rich food recorded"
-                  }
                 >
                   {day.hadIron ? "✅" : "—"}
                 </span>
 
                 <span
                   className="muted"
-                  style={{
-                    fontSize: "12px",
-                  }}
+                  style={{ fontSize: "12px" }}
                 >
                   {day.hadIron
                     ? "Iron-rich"
@@ -1097,8 +1039,7 @@ export default function Home() {
                 className="muted"
                 style={{ marginBottom: 0 }}
               >
-                No iron-rich foods recorded in the
-                past 7 days.
+                No iron-rich foods recorded in the past 7 days.
               </p>
             ) : (
               <div
@@ -1108,40 +1049,35 @@ export default function Home() {
                   gap: "10px",
                 }}
               >
-                {ironExposures.map(
-                  (exposure) => (
-                    <div
-                      key={exposure.id}
+                {ironExposures.map((exposure) => (
+                  <div
+                    key={exposure.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "16px",
+                      paddingBottom: "10px",
+                      borderBottom:
+                        "1px solid var(--border)",
+                    }}
+                  >
+                    <strong>
+                      {exposure.foodName}
+                    </strong>
+
+                    <span
+                      className="muted"
                       style={{
-                        display: "flex",
-                        justifyContent:
-                          "space-between",
-                        alignItems: "center",
-                        gap: "16px",
-                        paddingBottom:
-                          "10px",
-                        borderBottom:
-                          "1px solid var(--border)",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      <strong>
-                        {exposure.foodName}
-                      </strong>
-
-                      <span
-                        className="muted"
-                        style={{
-                          whiteSpace:
-                            "nowrap",
-                        }}
-                      >
-                        {formatShortDate(
-                          exposure.eatenAt
-                        )}
-                      </span>
-                    </div>
-                  )
-                )}
+                      {formatShortDate(
+                        exposure.eatenAt
+                      )}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </>

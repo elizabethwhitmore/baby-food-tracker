@@ -17,6 +17,7 @@ type Alias = {
 type ParsedFood = {
   food: string;
   preference: string | null;
+  notes: string | null;
   eaten_at: string;
 };
 
@@ -25,6 +26,7 @@ type PreviewFood = {
   foodId: string | null;
   canonicalName: string | null;
   preference: string | null;
+  notes: string | null;
   eatenAt: string;
   matched: boolean;
 };
@@ -595,6 +597,7 @@ export default function Home() {
             foodId: match?.id ?? null,
             canonicalName: match?.name ?? null,
             preference: parsed.preference,
+            notes: parsed.notes,
             eatenAt: parsed.eaten_at,
             matched: Boolean(match),
           };
@@ -843,7 +846,7 @@ export default function Home() {
         baby_id: babyId,
         food_id: item.foodId,
         preference: item.preference,
-        notes: null,
+        notes: item.notes,
         eaten_at: item.eatenAt,
         recorded_by: user.id,
       }));
@@ -1309,6 +1312,20 @@ export default function Home() {
                                 item.eatenAt
                               )}
                             </p>
+
+                            {item.notes && (
+                              <p
+                                style={{
+                                  margin: "8px 0 0",
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                Notes:{" "}
+                                <strong>
+                                  {item.notes}
+                                </strong>
+                              </p>
+                            )}
                           </>
                         ) : (
                           <>
@@ -1325,6 +1342,20 @@ export default function Home() {
                               This food isn&apos;t in
                               Thea&apos;s food library yet.
                             </p>
+
+                            {item.notes && (
+                              <p
+                                style={{
+                                  margin: "0 0 12px",
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                Notes:{" "}
+                                <strong>
+                                  {item.notes}
+                                </strong>
+                              </p>
+                            )}
 
                             {!metadata && (
                               <button

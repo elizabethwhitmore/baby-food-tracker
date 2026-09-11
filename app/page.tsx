@@ -37,6 +37,29 @@ type IronExposure = {
 
 type IronView = "calendar" | "list";
 
+type FoodMetadata = {
+  food_name: string;
+  category: string;
+  subcategory: string | null;
+  is_iron_rich: boolean;
+  plant_types: string[];
+  allergens: string[];
+  aliases: string[];
+};
+
+const APPROVED_ALLERGENS = [
+  "Milk",
+  "Egg",
+  "Peanut",
+  "Tree Nuts",
+  "Wheat",
+  "Soy",
+  "Sesame",
+  "Fish",
+  "Crustacean Shellfish",
+  "Molluscan Shellfish",
+];
+
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,6 +86,14 @@ export default function Home() {
   const [parsingAi, setParsingAi] = useState(false);
   const [savingAi, setSavingAi] = useState(false);
 
+  const [metadataByIndex, setMetadataByIndex] = useState<
+    Record<number, FoodMetadata>
+  >({});
+  const [suggestingIndex, setSuggestingIndex] =
+    useState<number | null>(null);
+  const [addingIndex, setAddingIndex] =
+    useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [savingFood, setSavingFood] = useState(false);
@@ -78,18 +109,24 @@ export default function Home() {
   }
 
   function formatShortDate(dateString: string) {
-    return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    return new Date(`${dateString}T00:00:00`).toLocaleDateString(
+      "en-US",
+      {
+        month: "short",
+        day: "numeric",
+      }
+    );
   }
 
   function formatReviewDate(dateString: string) {
-    return new Date(`${dateString}T00:00:00`).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    return new Date(`${dateString}T00:00:00`).toLocaleDateString(
+      "en-US",
+      {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }
+    );
   }
 
   function getPreferenceLabel(value: string | null) {
@@ -149,7 +186,9 @@ export default function Home() {
     }
 
     const foodIds = [
-      ...new Set((exposures ?? []).map((exposure) => exposure.food_id)),
+      ...new Set(
+        (exposures ?? []).map((exposure) => exposure.food_id)
+      ),
     ];
 
     if (foodIds.length === 0) {
@@ -168,7 +207,9 @@ export default function Home() {
     }
 
     const uniquePlants = new Set(
-      (mappings ?? []).map((mapping) => mapping.plant_type_id)
+      (mappings ?? []).map(
+        (mapping) => mapping.plant_type_id
+      )
     );
 
     setPlantCount(uniquePlants.size);
@@ -177,10 +218,11 @@ export default function Home() {
   async function loadIronExposures(currentBabyId: string) {
     const cutoff = getSevenDayCutoff();
 
-    const { data: ironFoods, error: ironFoodsError } = await supabase
-      .from("foods")
-      .select("id, name")
-      .eq("is_iron_rich", true);
+    const { data: ironFoods, error: ironFoodsError } =
+      await supabase
+        .from("foods")
+        .select("id, name")
+        .eq("is_iron_rich", true);
 
     if (ironFoodsError) {
       setMessage(ironFoodsError.message);
@@ -198,27 +240,30 @@ export default function Home() {
       ironFoods.map((food) => [food.id, food.name])
     );
 
-    const { data: exposures, error: exposureError } = await supabase
-      .from("food_exposures")
-      .select("id, food_id, eaten_at, created_at")
-      .eq("baby_id", currentBabyId)
-      .gte("eaten_at", cutoff)
-      .in("food_id", ironFoodIds)
-      .order("eaten_at", { ascending: false })
-      .order("created_at", { ascending: false });
+    const { data: exposures, error: exposureError } =
+      await supabase
+        .from("food_exposures")
+        .select("id, food_id, eaten_at, created_at")
+        .eq("baby_id", currentBabyId)
+        .gte("eaten_at", cutoff)
+        .in("food_id", ironFoodIds)
+        .order("eaten_at", { ascending: false })
+        .order("created_at", { ascending: false });
 
     if (exposureError) {
       setMessage(exposureError.message);
       return;
     }
 
-    const recentIronExposures: IronExposure[] = (exposures ?? []).map(
-      (exposure) => ({
-        id: exposure.id,
-        foodName: ironFoodNameMap.get(exposure.food_id) ?? "Unknown food",
-        eatenAt: exposure.eaten_at,
-      })
-    );
+    const recentIronExposures: IronExposure[] = (
+      exposures ?? []
+    ).map((exposure) => ({
+      id: exposure.id,
+      foodName:
+        ironFoodNameMap.get(exposure.food_id) ??
+        "Unknown food",
+      eatenAt: exposure.eaten_at,
+    }));
 
     setIronExposures(recentIronExposures);
   }
@@ -232,7 +277,8 @@ export default function Home() {
 
     if (babyError || !baby) {
       setMessage(
-        babyError?.message ?? "Could not find Thea's baby record."
+        babyError?.message ??
+          "Could not find Thea's baby record."
       );
       return;
     }
@@ -240,11 +286,12 @@ export default function Home() {
     setBabyId(baby.id);
     setBabyName(baby.name);
 
-    const { data: settings, error: settingsError } = await supabase
-      .from("baby_settings")
-      .select("weekly_plant_goal")
-      .eq("baby_id", baby.id)
-      .single();
+    const { data: settings, error: settingsError } =
+      await supabase
+        .from("baby_settings")
+        .select("weekly_plant_goal")
+        .eq("baby_id", baby.id)
+        .single();
 
     if (settingsError) {
       setMessage(settingsError.message);
@@ -258,19 +305,21 @@ export default function Home() {
   }
 
   async function loadFoodsAndAliases() {
-    const { data: foodData, error: foodError } = await supabase
-      .from("foods")
-      .select("id, name, show_in_dropdown")
-      .order("name");
+    const { data: foodData, error: foodError } =
+      await supabase
+        .from("foods")
+        .select("id, name, show_in_dropdown")
+        .order("name");
 
     if (foodError) {
       setMessage(foodError.message);
       return;
     }
 
-    const { data: aliasData, error: aliasError } = await supabase
-      .from("food_aliases")
-      .select("alias, food_id");
+    const { data: aliasData, error: aliasError } =
+      await supabase
+        .from("food_aliases")
+        .select("alias, food_id");
 
     if (aliasError) {
       setMessage(aliasError.message);
@@ -307,7 +356,9 @@ export default function Home() {
   }, []);
 
   const dropdownFoods = useMemo(() => {
-    return foods.filter((food) => food.show_in_dropdown);
+    return foods.filter(
+      (food) => food.show_in_dropdown
+    );
   }, [foods]);
 
   const lastSevenDays = useMemo(() => {
@@ -321,7 +372,8 @@ export default function Home() {
       const dateString = getLocalDateString(date);
 
       const hadIron = ironExposures.some(
-        (exposure) => exposure.eatenAt === dateString
+        (exposure) =>
+          exposure.eatenAt === dateString
       );
 
       days.push({
@@ -344,10 +396,11 @@ export default function Home() {
     setSigningIn(true);
     setMessage("");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
     if (error) {
       setMessage(error.message);
@@ -377,18 +430,22 @@ export default function Home() {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      setMessage("Could not identify the signed-in user.");
+      setMessage(
+        "Could not identify the signed-in user."
+      );
       setSavingFood(false);
       return;
     }
 
-    const { error } = await supabase.from("food_exposures").insert({
-      baby_id: babyId,
-      food_id: selectedFoodId,
-      preference: preference || null,
-      notes: notes || null,
-      recorded_by: user.id,
-    });
+    const { error } = await supabase
+      .from("food_exposures")
+      .insert({
+        baby_id: babyId,
+        food_id: selectedFoodId,
+        preference: preference || null,
+        notes: notes || null,
+        recorded_by: user.id,
+      });
 
     if (error) {
       setMessage(error.message);
@@ -410,6 +467,7 @@ export default function Home() {
   async function parseAiEntry() {
     setMessage("");
     setAiPreview([]);
+    setMetadataByIndex({});
 
     if (!aiText.trim()) {
       setMessage("Type what Thea ate first.");
@@ -425,32 +483,39 @@ export default function Home() {
       } = await supabase.auth.getSession();
 
       if (sessionError || !session) {
-        setMessage("Your sign-in session could not be found.");
+        setMessage(
+          "Your sign-in session could not be found."
+        );
         return;
       }
 
-      const response = await fetch("/api/parse-food", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          text: aiText,
-          today: getLocalDateString(new Date()),
-        }),
-      });
+      const response = await fetch(
+        "/api/parse-food",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            text: aiText,
+            today: getLocalDateString(new Date()),
+          }),
+        }
+      );
 
       const result = await response.json();
 
       if (!response.ok) {
         setMessage(
-          result.error ?? "Could not understand the food entry."
+          result.error ??
+            "Could not understand the food entry."
         );
         return;
       }
 
-      const parsedFoods = (result.foods ?? []) as ParsedFood[];
+      const parsedFoods = (result.foods ??
+        []) as ParsedFood[];
 
       if (parsedFoods.length === 0) {
         setMessage(
@@ -473,7 +538,8 @@ export default function Home() {
       const aliasMap = new Map<string, Food>();
 
       aliases.forEach((alias) => {
-        const matchingFood = foodById.get(alias.food_id);
+        const matchingFood =
+          foodById.get(alias.food_id);
 
         if (matchingFood) {
           aliasMap.set(
@@ -483,22 +549,31 @@ export default function Home() {
         }
       });
 
-      const preview: PreviewFood[] = parsedFoods.map((parsed) => {
-        const normalized = normalizeFoodName(parsed.food);
+      const preview: PreviewFood[] =
+        parsedFoods.map((parsed) => {
+          const normalized =
+            normalizeFoodName(parsed.food);
 
-        const canonicalMatch = canonicalMap.get(normalized);
-        const aliasMatch = aliasMap.get(normalized);
-        const match = canonicalMatch ?? aliasMatch ?? null;
+          const canonicalMatch =
+            canonicalMap.get(normalized);
 
-        return {
-          inputName: parsed.food,
-          foodId: match?.id ?? null,
-          canonicalName: match?.name ?? null,
-          preference: parsed.preference,
-          eatenAt: parsed.eaten_at,
-          matched: Boolean(match),
-        };
-      });
+          const aliasMatch =
+            aliasMap.get(normalized);
+
+          const match =
+            canonicalMatch ??
+            aliasMatch ??
+            null;
+
+          return {
+            inputName: parsed.food,
+            foodId: match?.id ?? null,
+            canonicalName: match?.name ?? null,
+            preference: parsed.preference,
+            eatenAt: parsed.eaten_at,
+            matched: Boolean(match),
+          };
+        });
 
       setAiPreview(preview);
     } catch {
@@ -510,6 +585,210 @@ export default function Home() {
     }
   }
 
+  async function suggestFoodMetadata(
+    index: number
+  ) {
+    const item = aiPreview[index];
+
+    if (!item || item.matched) {
+      return;
+    }
+
+    setMessage("");
+    setSuggestingIndex(index);
+
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        setMessage(
+          "Your sign-in session could not be found."
+        );
+        return;
+      }
+
+      const response = await fetch(
+        "/api/suggest-food-metadata",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            food_name: item.inputName,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(
+          result.error ??
+            "Could not suggest food information."
+        );
+        return;
+      }
+
+      setMetadataByIndex((current) => ({
+        ...current,
+        [index]: result as FoodMetadata,
+      }));
+    } catch {
+      setMessage(
+        "Something went wrong while preparing the new food."
+      );
+    } finally {
+      setSuggestingIndex(null);
+    }
+  }
+
+  function updateMetadata(
+    index: number,
+    updates: Partial<FoodMetadata>
+  ) {
+    setMetadataByIndex((current) => {
+      const existing = current[index];
+
+      if (!existing) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [index]: {
+          ...existing,
+          ...updates,
+        },
+      };
+    });
+  }
+
+  function toggleMetadataAllergen(
+    index: number,
+    allergen: string
+  ) {
+    const metadata = metadataByIndex[index];
+
+    if (!metadata) {
+      return;
+    }
+
+    const alreadySelected =
+      metadata.allergens.includes(allergen);
+
+    const allergens = alreadySelected
+      ? metadata.allergens.filter(
+          (item) => item !== allergen
+        )
+      : [...metadata.allergens, allergen];
+
+    updateMetadata(index, { allergens });
+  }
+
+  async function addFoodToLibrary(
+    index: number
+  ) {
+    const metadata = metadataByIndex[index];
+    const previewItem = aiPreview[index];
+
+    if (!metadata || !previewItem) {
+      return;
+    }
+
+    if (!metadata.food_name.trim()) {
+      setMessage("Food name is required.");
+      return;
+    }
+
+    setMessage("");
+    setAddingIndex(index);
+
+    const aliasSet = new Set(
+      metadata.aliases
+        .map((alias) => alias.trim())
+        .filter(Boolean)
+    );
+
+    if (
+      normalizeFoodName(previewItem.inputName) !==
+      normalizeFoodName(metadata.food_name)
+    ) {
+      aliasSet.add(previewItem.inputName.trim());
+    }
+
+    const { data: newFoodId, error } =
+      await supabase.rpc(
+        "add_food_to_library",
+        {
+          new_food_name:
+            metadata.food_name.trim(),
+
+          new_category:
+            metadata.category.trim() || null,
+
+          new_subcategory:
+            metadata.subcategory?.trim() ||
+            null,
+
+          new_is_iron_rich:
+            metadata.is_iron_rich,
+
+          new_plant_types:
+            metadata.plant_types
+              .map((plant) => plant.trim())
+              .filter(Boolean),
+
+          new_allergens:
+            metadata.allergens,
+
+          new_aliases:
+            Array.from(aliasSet),
+        }
+      );
+
+    if (error || !newFoodId) {
+      setMessage(
+        error?.message ??
+          "Could not add the food to the library."
+      );
+      setAddingIndex(null);
+      return;
+    }
+
+    setAiPreview((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              foodId: newFoodId as string,
+              canonicalName:
+                metadata.food_name.trim(),
+              matched: true,
+            }
+          : item
+      )
+    );
+
+    setMetadataByIndex((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+
+    await loadFoodsAndAliases();
+
+    setMessage(
+      `${metadata.food_name.trim()} was added to Thea's food library. ✓`
+    );
+
+    setAddingIndex(null);
+  }
+
   async function saveAiFoods() {
     setMessage("");
 
@@ -518,11 +797,13 @@ export default function Home() {
       return;
     }
 
-    const unmatched = aiPreview.filter((item) => !item.matched);
+    const unmatched = aiPreview.filter(
+      (item) => !item.matched
+    );
 
     if (unmatched.length > 0) {
       setMessage(
-        "One or more foods could not be matched to the food library. Nothing has been saved yet."
+        "One or more foods still need to be added or matched before saving."
       );
       return;
     }
@@ -535,7 +816,9 @@ export default function Home() {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      setMessage("Could not identify the signed-in user.");
+      setMessage(
+        "Could not identify the signed-in user."
+      );
       setSavingAi(false);
       return;
     }
@@ -561,6 +844,7 @@ export default function Home() {
 
     setAiText("");
     setAiPreview([]);
+    setMetadataByIndex({});
 
     await loadPlantCount(babyId);
     await loadIronExposures(babyId);
@@ -582,6 +866,7 @@ export default function Home() {
     setAliases([]);
     setAiText("");
     setAiPreview([]);
+    setMetadataByIndex({});
     setSelectedFoodId("");
     setPreference("");
     setNotes("");
@@ -600,7 +885,10 @@ export default function Home() {
 
   if (!signedIn) {
     return (
-      <main className="app-shell" style={{ maxWidth: "460px" }}>
+      <main
+        className="app-shell"
+        style={{ maxWidth: "460px" }}
+      >
         <h1 className="page-title">
           Thea&apos;s Food Tracker
         </h1>
@@ -617,7 +905,9 @@ export default function Home() {
               type="email"
               placeholder="Email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) =>
+                setEmail(e.target.value)
+              }
               style={{
                 marginTop: "8px",
                 marginBottom: "16px",
@@ -632,7 +922,9 @@ export default function Home() {
               type="password"
               placeholder="Password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) =>
+                setPassword(e.target.value)
+              }
               style={{
                 marginTop: "8px",
                 marginBottom: "18px",
@@ -645,10 +937,16 @@ export default function Home() {
             onClick={signIn}
             disabled={signingIn}
           >
-            {signingIn ? "Signing in..." : "Sign in"}
+            {signingIn
+              ? "Signing in..."
+              : "Sign in"}
           </button>
 
-          {message && <p className="message">{message}</p>}
+          {message && (
+            <p className="message">
+              {message}
+            </p>
+          )}
         </section>
       </main>
     );
@@ -661,31 +959,46 @@ export default function Home() {
       </h1>
 
       <p className="page-subtitle">
-        A simple place to track foods, preferences, plants, and allergens.
+        A simple place to track foods,
+        preferences, plants, and allergens.
       </p>
 
       <nav className="nav-card">
-        <a href="/" className="nav-link active">
+        <a
+          href="/"
+          className="nav-link active"
+        >
           🏠 Home
         </a>
 
-        <a href="/history" className="nav-link">
+        <a
+          href="/history"
+          className="nav-link"
+        >
           📖 History
         </a>
 
-        <a href="/allergens" className="nav-link">
+        <a
+          href="/allergens"
+          className="nav-link"
+        >
           🥜 Allergens
         </a>
       </nav>
 
       <section className="card green">
-        <h2 className="section-title">🌱 This Week</h2>
+        <h2 className="section-title">
+          🌱 This Week
+        </h2>
 
         <p className="big-number">
           {plantCount} / {plantGoal ?? 25}
         </p>
 
-        <p className="muted" style={{ marginBottom: 0 }}>
+        <p
+          className="muted"
+          style={{ marginBottom: 0 }}
+        >
           different plant types
         </p>
       </section>
@@ -724,7 +1037,9 @@ export default function Home() {
               type="checkbox"
               checked={manualMode}
               onChange={(e) => {
-                setManualMode(e.target.checked);
+                setManualMode(
+                  e.target.checked
+                );
                 setMessage("");
               }}
               style={{
@@ -739,8 +1054,9 @@ export default function Home() {
         {!manualMode ? (
           <>
             <p className="muted">
-              Tell me what Thea ate in your own words.
-              Nothing is saved until you review it.
+              Tell me what Thea ate in your own
+              words. Nothing is saved until you
+              review it.
             </p>
 
             <textarea
@@ -749,6 +1065,7 @@ export default function Home() {
               onChange={(e) => {
                 setAiText(e.target.value);
                 setAiPreview([]);
+                setMetadataByIndex({});
               }}
               maxLength={1000}
               placeholder="Example: Yesterday Thea had banana and Greek yogurt. She loved the banana."
@@ -759,11 +1076,15 @@ export default function Home() {
               onClick={parseAiEntry}
               disabled={parsingAi}
             >
-              {parsingAi ? "Understanding..." : "Review entry"}
+              {parsingAi
+                ? "Understanding..."
+                : "Review entry"}
             </button>
 
             {aiPreview.length > 0 && (
-              <div style={{ marginTop: "24px" }}>
+              <div
+                style={{ marginTop: "24px" }}
+              >
                 <h3
                   style={{
                     fontFamily:
@@ -780,64 +1101,430 @@ export default function Home() {
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: "10px",
+                    gap: "12px",
                   }}
                 >
-                  {aiPreview.map((item, index) => (
-                    <div
-                      key={`${item.inputName}-${index}`}
-                      style={{
-                        border: "1px solid var(--border)",
-                        borderRadius: "14px",
-                        padding: "14px",
-                        background: "white",
-                      }}
-                    >
-                      {item.matched ? (
-                        <>
-                          <strong>{item.canonicalName}</strong>
+                  {aiPreview.map(
+                    (item, index) => {
+                      const metadata =
+                        metadataByIndex[index];
 
-                          {item.preference && (
-                            <p style={{ margin: "8px 0 0" }}>
-                              Preference:{" "}
+                      return (
+                        <div
+                          key={`${item.inputName}-${index}`}
+                          style={{
+                            border:
+                              "1px solid var(--border)",
+                            borderRadius: "14px",
+                            padding: "14px",
+                            background: "white",
+                          }}
+                        >
+                          {item.matched ? (
+                            <>
                               <strong>
-                                {getPreferenceLabel(item.preference)}
+                                {
+                                  item.canonicalName
+                                }
                               </strong>
-                            </p>
+
+                              {item.preference && (
+                                <p
+                                  style={{
+                                    margin:
+                                      "8px 0 0",
+                                  }}
+                                >
+                                  Preference:{" "}
+                                  <strong>
+                                    {getPreferenceLabel(
+                                      item.preference
+                                    )}
+                                  </strong>
+                                </p>
+                              )}
+
+                              <p
+                                className="muted"
+                                style={{
+                                  margin:
+                                    "8px 0 0",
+                                }}
+                              >
+                                Date:{" "}
+                                {formatReviewDate(
+                                  item.eatenAt
+                                )}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <strong>
+                                ⚠️{" "}
+                                {item.inputName}
+                              </strong>
+
+                              <p
+                                className="muted"
+                                style={{
+                                  margin:
+                                    "8px 0 12px",
+                                }}
+                              >
+                                This food
+                                isn&apos;t in
+                                Thea&apos;s food
+                                library yet.
+                              </p>
+
+                              {!metadata && (
+                                <button
+                                  className="secondary-button"
+                                  onClick={() =>
+                                    suggestFoodMetadata(
+                                      index
+                                    )
+                                  }
+                                  disabled={
+                                    suggestingIndex ===
+                                    index
+                                  }
+                                >
+                                  {suggestingIndex ===
+                                  index
+                                    ? "Preparing..."
+                                    : "+ Review & add to food library"}
+                                </button>
+                              )}
+
+                              {metadata && (
+                                <div
+                                  style={{
+                                    marginTop:
+                                      "16px",
+                                    paddingTop:
+                                      "16px",
+                                    borderTop:
+                                      "1px solid var(--border)",
+                                  }}
+                                >
+                                  <h4
+                                    style={{
+                                      margin:
+                                        "0 0 14px",
+                                      fontSize:
+                                        "18px",
+                                    }}
+                                  >
+                                    Review food
+                                    details
+                                  </h4>
+
+                                  <label className="label">
+                                    Food name
+
+                                    <input
+                                      className="field"
+                                      value={
+                                        metadata.food_name
+                                      }
+                                      onChange={(
+                                        e
+                                      ) =>
+                                        updateMetadata(
+                                          index,
+                                          {
+                                            food_name:
+                                              e
+                                                .target
+                                                .value,
+                                          }
+                                        )
+                                      }
+                                      style={{
+                                        marginTop:
+                                          "8px",
+                                        marginBottom:
+                                          "14px",
+                                      }}
+                                    />
+                                  </label>
+
+                                  <label className="label">
+                                    Category
+
+                                    <input
+                                      className="field"
+                                      value={
+                                        metadata.category
+                                      }
+                                      onChange={(
+                                        e
+                                      ) =>
+                                        updateMetadata(
+                                          index,
+                                          {
+                                            category:
+                                              e
+                                                .target
+                                                .value,
+                                          }
+                                        )
+                                      }
+                                      style={{
+                                        marginTop:
+                                          "8px",
+                                        marginBottom:
+                                          "14px",
+                                      }}
+                                    />
+                                  </label>
+
+                                  <label className="label">
+                                    Subcategory
+
+                                    <input
+                                      className="field"
+                                      value={
+                                        metadata.subcategory ??
+                                        ""
+                                      }
+                                      onChange={(
+                                        e
+                                      ) =>
+                                        updateMetadata(
+                                          index,
+                                          {
+                                            subcategory:
+                                              e
+                                                .target
+                                                .value ||
+                                              null,
+                                          }
+                                        )
+                                      }
+                                      style={{
+                                        marginTop:
+                                          "8px",
+                                        marginBottom:
+                                          "14px",
+                                      }}
+                                    />
+                                  </label>
+
+                                  <label className="label">
+                                    Plant type
+                                    {metadata
+                                      .plant_types
+                                      .length >
+                                    1
+                                      ? "s"
+                                      : ""}
+
+                                    <input
+                                      className="field"
+                                      value={metadata.plant_types.join(
+                                        ", "
+                                      )}
+                                      onChange={(
+                                        e
+                                      ) =>
+                                        updateMetadata(
+                                          index,
+                                          {
+                                            plant_types:
+                                              e.target.value
+                                                .split(
+                                                  ","
+                                                )
+                                                .map(
+                                                  (
+                                                    value
+                                                  ) =>
+                                                    value.trim()
+                                                )
+                                                .filter(
+                                                  Boolean
+                                                ),
+                                          }
+                                        )
+                                      }
+                                      placeholder="Example: Dragon Fruit"
+                                      style={{
+                                        marginTop:
+                                          "8px",
+                                        marginBottom:
+                                          "14px",
+                                      }}
+                                    />
+                                  </label>
+
+                                  <label
+                                    style={{
+                                      display:
+                                        "flex",
+                                      alignItems:
+                                        "center",
+                                      gap: "9px",
+                                      marginBottom:
+                                        "16px",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        metadata.is_iron_rich
+                                      }
+                                      onChange={(
+                                        e
+                                      ) =>
+                                        updateMetadata(
+                                          index,
+                                          {
+                                            is_iron_rich:
+                                              e
+                                                .target
+                                                .checked,
+                                          }
+                                        )
+                                      }
+                                    />
+
+                                    Iron-rich
+                                    food
+                                  </label>
+
+                                  <div
+                                    style={{
+                                      marginBottom:
+                                        "16px",
+                                    }}
+                                  >
+                                    <span className="label">
+                                      Allergens
+                                    </span>
+
+                                    <div
+                                      style={{
+                                        display:
+                                          "flex",
+                                        flexWrap:
+                                          "wrap",
+                                        gap:
+                                          "8px 14px",
+                                        marginTop:
+                                          "8px",
+                                      }}
+                                    >
+                                      {APPROVED_ALLERGENS.map(
+                                        (
+                                          allergen
+                                        ) => (
+                                          <label
+                                            key={
+                                              allergen
+                                            }
+                                            style={{
+                                              display:
+                                                "flex",
+                                              alignItems:
+                                                "center",
+                                              gap:
+                                                "6px",
+                                              fontSize:
+                                                "14px",
+                                            }}
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={metadata.allergens.includes(
+                                                allergen
+                                              )}
+                                              onChange={() =>
+                                                toggleMetadataAllergen(
+                                                  index,
+                                                  allergen
+                                                )
+                                              }
+                                            />
+
+                                            {
+                                              allergen
+                                            }
+                                          </label>
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <label className="label">
+                                    Aliases
+
+                                    <input
+                                      className="field"
+                                      value={metadata.aliases.join(
+                                        ", "
+                                      )}
+                                      onChange={(
+                                        e
+                                      ) =>
+                                        updateMetadata(
+                                          index,
+                                          {
+                                            aliases:
+                                              e.target.value
+                                                .split(
+                                                  ","
+                                                )
+                                                .map(
+                                                  (
+                                                    value
+                                                  ) =>
+                                                    value.trim()
+                                                )
+                                                .filter(
+                                                  Boolean
+                                                ),
+                                          }
+                                        )
+                                      }
+                                      placeholder="Separate aliases with commas"
+                                      style={{
+                                        marginTop:
+                                          "8px",
+                                        marginBottom:
+                                          "16px",
+                                      }}
+                                    />
+                                  </label>
+
+                                  <button
+                                    className="primary-button"
+                                    onClick={() =>
+                                      addFoodToLibrary(
+                                        index
+                                      )
+                                    }
+                                    disabled={
+                                      addingIndex ===
+                                      index
+                                    }
+                                  >
+                                    {addingIndex ===
+                                    index
+                                      ? "Adding..."
+                                      : "Add to food library"}
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           )}
-
-                          <p
-                            className="muted"
-                            style={{ margin: "8px 0 0" }}
-                          >
-                            Date: {formatReviewDate(item.eatenAt)}
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <strong>⚠️ {item.inputName}</strong>
-
-                          <p
-                            className="muted"
-                            style={{ margin: "8px 0 0" }}
-                          >
-                            I couldn&apos;t match this to a food in
-                            Thea&apos;s library.
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                        </div>
+                      );
+                    }
+                  )}
                 </div>
-
-                {aiPreview.some((item) => !item.matched) && (
-                  <p
-                    className="message"
-                    style={{ marginTop: "14px" }}
-                  >
-                    Nothing will be saved until all foods can be matched.
-                  </p>
-                )}
 
                 <div
                   style={{
@@ -852,15 +1539,23 @@ export default function Home() {
                     onClick={saveAiFoods}
                     disabled={
                       savingAi ||
-                      aiPreview.some((item) => !item.matched)
+                      aiPreview.some(
+                        (item) =>
+                          !item.matched
+                      )
                     }
                   >
-                    {savingAi ? "Saving..." : "Save foods"}
+                    {savingAi
+                      ? "Saving..."
+                      : "Save foods"}
                   </button>
 
                   <button
                     className="secondary-button"
-                    onClick={() => setAiPreview([])}
+                    onClick={() => {
+                      setAiPreview([]);
+                      setMetadataByIndex({});
+                    }}
                     disabled={savingAi}
                   >
                     Edit entry
@@ -877,15 +1572,26 @@ export default function Home() {
               <select
                 className="select-field"
                 value={selectedFoodId}
-                onChange={(e) => setSelectedFoodId(e.target.value)}
+                onChange={(e) =>
+                  setSelectedFoodId(
+                    e.target.value
+                  )
+                }
               >
-                <option value="">Choose a food</option>
+                <option value="">
+                  Choose a food
+                </option>
 
-                {dropdownFoods.map((food) => (
-                  <option key={food.id} value={food.id}>
-                    {food.name}
-                  </option>
-                ))}
+                {dropdownFoods.map(
+                  (food) => (
+                    <option
+                      key={food.id}
+                      value={food.id}
+                    >
+                      {food.name}
+                    </option>
+                  )
+                )}
               </select>
             </label>
 
@@ -895,12 +1601,24 @@ export default function Home() {
               <select
                 className="select-field"
                 value={preference}
-                onChange={(e) => setPreference(e.target.value)}
+                onChange={(e) =>
+                  setPreference(
+                    e.target.value
+                  )
+                }
               >
-                <option value="">Not recorded</option>
-                <option value="loved">Loved ❤️</option>
-                <option value="liked">Liked 🙂</option>
-                <option value="neutral">Neutral 😐</option>
+                <option value="">
+                  Not recorded
+                </option>
+                <option value="loved">
+                  Loved ❤️
+                </option>
+                <option value="liked">
+                  Liked 🙂
+                </option>
+                <option value="neutral">
+                  Neutral 😐
+                </option>
                 <option value="disliked">
                   Didn&apos;t like 🙅‍♀️
                 </option>
@@ -913,7 +1631,9 @@ export default function Home() {
               <textarea
                 className="textarea-field"
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) =>
+                  setNotes(e.target.value)
+                }
                 placeholder="Optional notes"
               />
             </label>
@@ -923,28 +1643,43 @@ export default function Home() {
               onClick={saveFoodExposure}
               disabled={savingFood}
             >
-              {savingFood ? "Saving..." : "Save food"}
+              {savingFood
+                ? "Saving..."
+                : "Save food"}
             </button>
           </>
         )}
 
-        {message && <p className="message">{message}</p>}
+        {message && (
+          <p className="message">
+            {message}
+          </p>
+        )}
       </section>
 
       <section className="card soft">
-        <h2 className="section-title">💡 Meal Ideas</h2>
+        <h2 className="section-title">
+          💡 Meal Ideas
+        </h2>
 
-        <p className="muted" style={{ marginBottom: 0 }}>
-          At least one safe food, no more than one new food, with repeat
-          exposure encouraged.
+        <p
+          className="muted"
+          style={{ marginBottom: 0 }}
+        >
+          At least one safe food, no more than
+          one new food, with repeat exposure
+          encouraged.
         </p>
       </section>
 
       <section className="card soft">
-        <h2 className="section-title">🫘 Iron-Rich Foods</h2>
+        <h2 className="section-title">
+          🫘 Iron-Rich Foods
+        </h2>
 
         <p className="muted">
-          Thea&apos;s iron-rich foods over the past 7 days.
+          Thea&apos;s iron-rich foods over the
+          past 7 days.
         </p>
 
         <div
@@ -961,7 +1696,9 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() => setIronView("calendar")}
+            onClick={() =>
+              setIronView("calendar")
+            }
           >
             📅 Calendar
           </button>
@@ -972,7 +1709,9 @@ export default function Home() {
                 ? "primary-button"
                 : "secondary-button"
             }
-            onClick={() => setIronView("list")}
+            onClick={() =>
+              setIronView("list")
+            }
           >
             🫘 Food List
           </button>
@@ -992,7 +1731,8 @@ export default function Home() {
                 key={day.dateString}
                 style={{
                   background: "white",
-                  border: "1px solid var(--border)",
+                  border:
+                    "1px solid var(--border)",
                   borderRadius: "14px",
                   padding: "14px 8px",
                   textAlign: "center",
@@ -1025,14 +1765,20 @@ export default function Home() {
                     marginBottom: "5px",
                   }}
                 >
-                  {day.hadIron ? "✅" : "—"}
+                  {day.hadIron
+                    ? "✅"
+                    : "—"}
                 </span>
 
                 <span
                   className="muted"
-                  style={{ fontSize: "12px" }}
+                  style={{
+                    fontSize: "12px",
+                  }}
                 >
-                  {day.hadIron ? "Iron-rich" : "None"}
+                  {day.hadIron
+                    ? "Iron-rich"
+                    : "None"}
                 </span>
               </div>
             ))}
@@ -1041,43 +1787,63 @@ export default function Home() {
 
         {ironView === "list" && (
           <>
-            {ironExposures.length === 0 ? (
+            {ironExposures.length ===
+            0 ? (
               <p
                 className="muted"
-                style={{ marginBottom: 0 }}
+                style={{
+                  marginBottom: 0,
+                }}
               >
-                No iron-rich foods recorded in the past 7 days.
+                No iron-rich foods recorded in
+                the past 7 days.
               </p>
             ) : (
               <div
                 style={{
                   display: "flex",
-                  flexDirection: "column",
+                  flexDirection:
+                    "column",
                   gap: "10px",
                 }}
               >
-                {ironExposures.map((exposure) => (
-                  <div
-                    key={exposure.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "16px",
-                      paddingBottom: "10px",
-                      borderBottom: "1px solid var(--border)",
-                    }}
-                  >
-                    <strong>{exposure.foodName}</strong>
-
-                    <span
-                      className="muted"
-                      style={{ whiteSpace: "nowrap" }}
+                {ironExposures.map(
+                  (exposure) => (
+                    <div
+                      key={exposure.id}
+                      style={{
+                        display: "flex",
+                        justifyContent:
+                          "space-between",
+                        alignItems:
+                          "center",
+                        gap: "16px",
+                        paddingBottom:
+                          "10px",
+                        borderBottom:
+                          "1px solid var(--border)",
+                      }}
                     >
-                      {formatShortDate(exposure.eatenAt)}
-                    </span>
-                  </div>
-                ))}
+                      <strong>
+                        {
+                          exposure.foodName
+                        }
+                      </strong>
+
+                      <span
+                        className="muted"
+                        style={{
+                          whiteSpace:
+                            "nowrap",
+                        }}
+                      >
+                        {formatShortDate(
+                          exposure.eatenAt
+                        )}
+                      </span>
+                    </div>
+                  )
+                )}
               </div>
             )}
           </>

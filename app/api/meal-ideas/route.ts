@@ -267,6 +267,9 @@ export async function POST(request: Request) {
                     `Previously disliked or neutral foods may still be suggested because repeated exposure is encouraged. ` +
                     `Do not reject a food simply because Thea disliked it before. ` +
                     `Prefer meals that help expose Thea to varied plants and iron-rich foods when practical. ` +
+                    `Herbs and spices must NOT be used as one of the main foods in a meal suggestion. ` +
+                    `A meal's foods should be substantive foods that make sense together as a practical meal. ` +
+                    `Herbs and spices may be mentioned only as an optional flavoring, and they do not count toward the required number of foods in a meal. ` +
                     `At least one of the meal ideas MUST include a meat-based food when a meat option is available in the provided food lists. ` +
                     `Do not invent foods that are not in the provided lists. ` +
                     `Do not mention portion sizes, choking guidance, preparation instructions, feeding method, or medical advice. ` +

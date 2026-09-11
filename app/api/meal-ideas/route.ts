@@ -267,6 +267,7 @@ export async function POST(request: Request) {
                     `Previously disliked or neutral foods may still be suggested because repeated exposure is encouraged. ` +
                     `Do not reject a food simply because Thea disliked it before. ` +
                     `Prefer meals that help expose Thea to varied plants and iron-rich foods when practical. ` +
+                    `At least one of the meal ideas MUST include a meat-based food when a meat option is available in the provided food lists. ` +
                     `Do not invent foods that are not in the provided lists. ` +
                     `Do not mention portion sizes, choking guidance, preparation instructions, feeding method, or medical advice. ` +
                     `Keep each meal simple and realistic. ` +

@@ -66,8 +66,11 @@ export default function Home() {
 
   const [babyId, setBabyId] = useState("");
   const [babyName, setBabyName] = useState("");
+
   const [plantGoal, setPlantGoal] = useState<number | null>(null);
   const [plantCount, setPlantCount] = useState(0);
+  const [weeklyPlantTypes, setWeeklyPlantTypes] = useState<string[]>([]);
+  const [showPlantTypes, setShowPlantTypes] = useState(false);
 
   const [ironExposures, setIronExposures] = useState<IronExposure[]>([]);
   const [ironView, setIronView] = useState<IronView>("calendar");
@@ -89,8 +92,10 @@ export default function Home() {
   const [metadataByIndex, setMetadataByIndex] = useState<
     Record<number, FoodMetadata>
   >({});
+
   const [suggestingIndex, setSuggestingIndex] =
     useState<number | null>(null);
+
   const [addingIndex, setAddingIndex] =
     useState<number | null>(null);
 
@@ -165,6 +170,7 @@ export default function Home() {
 
   function getSevenDayCutoff() {
     const cutoff = new Date();
+
     cutoff.setHours(0, 0, 0, 0);
     cutoff.setDate(cutoff.getDate() - 6);
 
@@ -174,11 +180,12 @@ export default function Home() {
   async function loadPlantCount(currentBabyId: string) {
     const startOfWeek = getStartOfWeek();
 
-    const { data: exposures, error: exposureError } = await supabase
-      .from("food_exposures")
-      .select("food_id")
-      .eq("baby_id", currentBabyId)
-      .gte("eaten_at", startOfWeek);
+    const { data: exposures, error: exposureError } =
+      await supabase
+        .from("food_exposures")
+        .select("food_id")
+        .eq("baby_id", currentBabyId)
+        .gte("eaten_at", startOfWeek);
 
     if (exposureError) {
       setMessage(exposureError.message);
@@ -187,35 +194,66 @@ export default function Home() {
 
     const foodIds = [
       ...new Set(
-        (exposures ?? []).map((exposure) => exposure.food_id)
+        (exposures ?? []).map(
+          (exposure) => exposure.food_id
+        )
       ),
     ];
 
     if (foodIds.length === 0) {
       setPlantCount(0);
+      setWeeklyPlantTypes([]);
       return;
     }
 
-    const { data: mappings, error: mappingError } = await supabase
-      .from("food_plant_types")
-      .select("plant_type_id")
-      .in("food_id", foodIds);
+    const { data: mappings, error: mappingError } =
+      await supabase
+        .from("food_plant_types")
+        .select("plant_type_id")
+        .in("food_id", foodIds);
 
     if (mappingError) {
       setMessage(mappingError.message);
       return;
     }
 
-    const uniquePlants = new Set(
-      (mappings ?? []).map(
-        (mapping) => mapping.plant_type_id
+    const plantTypeIds = [
+      ...new Set(
+        (mappings ?? []).map(
+          (mapping) => mapping.plant_type_id
+        )
+      ),
+    ];
+
+    setPlantCount(plantTypeIds.length);
+
+    if (plantTypeIds.length === 0) {
+      setWeeklyPlantTypes([]);
+      return;
+    }
+
+    const { data: plantTypes, error: plantTypesError } =
+      await supabase
+        .from("plant_types")
+        .select("id, name")
+        .in("id", plantTypeIds)
+        .order("name");
+
+    if (plantTypesError) {
+      setMessage(plantTypesError.message);
+      return;
+    }
+
+    setWeeklyPlantTypes(
+      (plantTypes ?? []).map(
+        (plantType) => plantType.name
       )
     );
-
-    setPlantCount(uniquePlants.size);
   }
 
-  async function loadIronExposures(currentBabyId: string) {
+  async function loadIronExposures(
+    currentBabyId: string
+  ) {
     const cutoff = getSevenDayCutoff();
 
     const { data: ironFoods, error: ironFoodsError } =
@@ -234,46 +272,62 @@ export default function Home() {
       return;
     }
 
-    const ironFoodIds = ironFoods.map((food) => food.id);
+    const ironFoodIds = ironFoods.map(
+      (food) => food.id
+    );
 
     const ironFoodNameMap = new Map(
-      ironFoods.map((food) => [food.id, food.name])
+      ironFoods.map((food) => [
+        food.id,
+        food.name,
+      ])
     );
 
     const { data: exposures, error: exposureError } =
       await supabase
         .from("food_exposures")
-        .select("id, food_id, eaten_at, created_at")
+        .select(
+          "id, food_id, eaten_at, created_at"
+        )
         .eq("baby_id", currentBabyId)
         .gte("eaten_at", cutoff)
         .in("food_id", ironFoodIds)
-        .order("eaten_at", { ascending: false })
-        .order("created_at", { ascending: false });
+        .order("eaten_at", {
+          ascending: false,
+        })
+        .order("created_at", {
+          ascending: false,
+        });
 
     if (exposureError) {
       setMessage(exposureError.message);
       return;
     }
 
-    const recentIronExposures: IronExposure[] = (
-      exposures ?? []
-    ).map((exposure) => ({
-      id: exposure.id,
-      foodName:
-        ironFoodNameMap.get(exposure.food_id) ??
-        "Unknown food",
-      eatenAt: exposure.eaten_at,
-    }));
+    const recentIronExposures: IronExposure[] =
+      (exposures ?? []).map(
+        (exposure) => ({
+          id: exposure.id,
+          foodName:
+            ironFoodNameMap.get(
+              exposure.food_id
+            ) ?? "Unknown food",
+          eatenAt: exposure.eaten_at,
+        })
+      );
 
-    setIronExposures(recentIronExposures);
+    setIronExposures(
+      recentIronExposures
+    );
   }
 
   async function loadBabyData() {
-    const { data: baby, error: babyError } = await supabase
-      .from("babies")
-      .select("id, name")
-      .limit(1)
-      .single();
+    const { data: baby, error: babyError } =
+      await supabase
+        .from("babies")
+        .select("id, name")
+        .limit(1)
+        .single();
 
     if (babyError || !baby) {
       setMessage(
@@ -294,11 +348,15 @@ export default function Home() {
         .single();
 
     if (settingsError) {
-      setMessage(settingsError.message);
+      setMessage(
+        settingsError.message
+      );
       return;
     }
 
-    setPlantGoal(settings.weekly_plant_goal);
+    setPlantGoal(
+      settings.weekly_plant_goal
+    );
 
     await loadPlantCount(baby.id);
     await loadIronExposures(baby.id);
@@ -308,7 +366,9 @@ export default function Home() {
     const { data: foodData, error: foodError } =
       await supabase
         .from("foods")
-        .select("id, name, show_in_dropdown")
+        .select(
+          "id, name, show_in_dropdown"
+        )
         .order("name");
 
     if (foodError) {
@@ -326,8 +386,13 @@ export default function Home() {
       return;
     }
 
-    setFoods((foodData ?? []) as Food[]);
-    setAliases((aliasData ?? []) as Alias[]);
+    setFoods(
+      (foodData ?? []) as Food[]
+    );
+
+    setAliases(
+      (aliasData ?? []) as Alias[]
+    );
   }
 
   useEffect(() => {
@@ -335,7 +400,8 @@ export default function Home() {
       const {
         data: { session },
         error,
-      } = await supabase.auth.getSession();
+      } =
+        await supabase.auth.getSession();
 
       if (error) {
         setMessage(error.message);
@@ -345,6 +411,7 @@ export default function Home() {
 
       if (session) {
         setSignedIn(true);
+
         await loadBabyData();
         await loadFoodsAndAliases();
       }
@@ -366,25 +433,39 @@ export default function Home() {
 
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
+
       date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() - i);
-
-      const dateString = getLocalDateString(date);
-
-      const hadIron = ironExposures.some(
-        (exposure) =>
-          exposure.eatenAt === dateString
+      date.setDate(
+        date.getDate() - i
       );
+
+      const dateString =
+        getLocalDateString(date);
+
+      const hadIron =
+        ironExposures.some(
+          (exposure) =>
+            exposure.eatenAt ===
+            dateString
+        );
 
       days.push({
         dateString,
-        weekday: date.toLocaleDateString("en-US", {
-          weekday: "short",
-        }),
-        dateLabel: date.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        }),
+        weekday:
+          date.toLocaleDateString(
+            "en-US",
+            {
+              weekday: "short",
+            }
+          ),
+        dateLabel:
+          date.toLocaleDateString(
+            "en-US",
+            {
+              month: "short",
+              day: "numeric",
+            }
+          ),
         hadIron,
       });
     }
@@ -397,10 +478,12 @@ export default function Home() {
     setMessage("");
 
     const { error } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      await supabase.auth.signInWithPassword(
+        {
+          email,
+          password,
+        }
+      );
 
     if (error) {
       setMessage(error.message);
@@ -409,8 +492,10 @@ export default function Home() {
     }
 
     setSignedIn(true);
+
     await loadBabyData();
     await loadFoodsAndAliases();
+
     setSigningIn(false);
   }
 
@@ -418,7 +503,9 @@ export default function Home() {
     setMessage("");
 
     if (!selectedFoodId) {
-      setMessage("Please choose a food.");
+      setMessage(
+        "Please choose a food."
+      );
       return;
     }
 
@@ -437,15 +524,17 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase
-      .from("food_exposures")
-      .insert({
-        baby_id: babyId,
-        food_id: selectedFoodId,
-        preference: preference || null,
-        notes: notes || null,
-        recorded_by: user.id,
-      });
+    const { error } =
+      await supabase
+        .from("food_exposures")
+        .insert({
+          baby_id: babyId,
+          food_id: selectedFoodId,
+          preference:
+            preference || null,
+          notes: notes || null,
+          recorded_by: user.id,
+        });
 
     if (error) {
       setMessage(error.message);
@@ -458,7 +547,9 @@ export default function Home() {
     setNotes("");
 
     await loadPlantCount(babyId);
-    await loadIronExposures(babyId);
+    await loadIronExposures(
+      babyId
+    );
 
     setMessage("Food saved! ✓");
     setSavingFood(false);
@@ -470,7 +561,9 @@ export default function Home() {
     setMetadataByIndex({});
 
     if (!aiText.trim()) {
-      setMessage("Type what Thea ate first.");
+      setMessage(
+        "Type what Thea ate first."
+      );
       return;
     }
 
@@ -480,9 +573,13 @@ export default function Home() {
       const {
         data: { session },
         error: sessionError,
-      } = await supabase.auth.getSession();
+      } =
+        await supabase.auth.getSession();
 
-      if (sessionError || !session) {
+      if (
+        sessionError ||
+        !session
+      ) {
         setMessage(
           "Your sign-in session could not be found."
         );
@@ -494,17 +591,22 @@ export default function Home() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             text: aiText,
-            today: getLocalDateString(new Date()),
+            today:
+              getLocalDateString(
+                new Date()
+              ),
           }),
         }
       );
 
-      const result = await response.json();
+      const result =
+        await response.json();
 
       if (!response.ok) {
         setMessage(
@@ -514,66 +616,100 @@ export default function Home() {
         return;
       }
 
-      const parsedFoods = (result.foods ??
-        []) as ParsedFood[];
+      const parsedFoods =
+        (result.foods ??
+          []) as ParsedFood[];
 
-      if (parsedFoods.length === 0) {
+      if (
+        parsedFoods.length === 0
+      ) {
         setMessage(
           "I couldn't find any foods Thea ate in that entry."
         );
         return;
       }
 
-      const canonicalMap = new Map(
-        foods.map((food) => [
-          normalizeFoodName(food.name),
-          food,
-        ])
-      );
+      const canonicalMap =
+        new Map(
+          foods.map((food) => [
+            normalizeFoodName(
+              food.name
+            ),
+            food,
+          ])
+        );
 
-      const foodById = new Map(
-        foods.map((food) => [food.id, food])
-      );
+      const foodById =
+        new Map(
+          foods.map((food) => [
+            food.id,
+            food,
+          ])
+        );
 
-      const aliasMap = new Map<string, Food>();
+      const aliasMap =
+        new Map<string, Food>();
 
-      aliases.forEach((alias) => {
-        const matchingFood =
-          foodById.get(alias.food_id);
+      aliases.forEach(
+        (alias) => {
+          const matchingFood =
+            foodById.get(
+              alias.food_id
+            );
 
-        if (matchingFood) {
-          aliasMap.set(
-            normalizeFoodName(alias.alias),
-            matchingFood
-          );
+          if (matchingFood) {
+            aliasMap.set(
+              normalizeFoodName(
+                alias.alias
+              ),
+              matchingFood
+            );
+          }
         }
-      });
+      );
 
-      const preview: PreviewFood[] =
-        parsedFoods.map((parsed) => {
-          const normalized =
-            normalizeFoodName(parsed.food);
+      const preview:
+        PreviewFood[] =
+        parsedFoods.map(
+          (parsed) => {
+            const normalized =
+              normalizeFoodName(
+                parsed.food
+              );
 
-          const canonicalMatch =
-            canonicalMap.get(normalized);
+            const canonicalMatch =
+              canonicalMap.get(
+                normalized
+              );
 
-          const aliasMatch =
-            aliasMap.get(normalized);
+            const aliasMatch =
+              aliasMap.get(
+                normalized
+              );
 
-          const match =
-            canonicalMatch ??
-            aliasMatch ??
-            null;
+            const match =
+              canonicalMatch ??
+              aliasMatch ??
+              null;
 
-          return {
-            inputName: parsed.food,
-            foodId: match?.id ?? null,
-            canonicalName: match?.name ?? null,
-            preference: parsed.preference,
-            eatenAt: parsed.eaten_at,
-            matched: Boolean(match),
-          };
-        });
+            return {
+              inputName:
+                parsed.food,
+              foodId:
+                match?.id ??
+                null,
+              canonicalName:
+                match?.name ??
+                null,
+              preference:
+                parsed.preference,
+              eatenAt:
+                parsed.eaten_at,
+              matched:
+                Boolean(match),
+            };
+          }
+        );
 
       setAiPreview(preview);
     } catch {
@@ -588,9 +724,13 @@ export default function Home() {
   async function suggestFoodMetadata(
     index: number
   ) {
-    const item = aiPreview[index];
+    const item =
+      aiPreview[index];
 
-    if (!item || item.matched) {
+    if (
+      !item ||
+      item.matched
+    ) {
       return;
     }
 
@@ -601,9 +741,13 @@ export default function Home() {
       const {
         data: { session },
         error: sessionError,
-      } = await supabase.auth.getSession();
+      } =
+        await supabase.auth.getSession();
 
-      if (sessionError || !session) {
+      if (
+        sessionError ||
+        !session
+      ) {
         setMessage(
           "Your sign-in session could not be found."
         );
@@ -615,16 +759,19 @@ export default function Home() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            food_name: item.inputName,
+            food_name:
+              item.inputName,
           }),
         }
       );
 
-      const result = await response.json();
+      const result =
+        await response.json();
 
       if (!response.ok) {
         setMessage(
@@ -634,10 +781,13 @@ export default function Home() {
         return;
       }
 
-      setMetadataByIndex((current) => ({
-        ...current,
-        [index]: result as FoodMetadata,
-      }));
+      setMetadataByIndex(
+        (current) => ({
+          ...current,
+          [index]:
+            result as FoodMetadata,
+        })
+      );
     } catch {
       setMessage(
         "Something went wrong while preparing the new food."
@@ -649,109 +799,150 @@ export default function Home() {
 
   function updateMetadata(
     index: number,
-    updates: Partial<FoodMetadata>
+    updates:
+      Partial<FoodMetadata>
   ) {
-    setMetadataByIndex((current) => {
-      const existing = current[index];
+    setMetadataByIndex(
+      (current) => {
+        const existing =
+          current[index];
 
-      if (!existing) {
-        return current;
+        if (!existing) {
+          return current;
+        }
+
+        return {
+          ...current,
+          [index]: {
+            ...existing,
+            ...updates,
+          },
+        };
       }
-
-      return {
-        ...current,
-        [index]: {
-          ...existing,
-          ...updates,
-        },
-      };
-    });
+    );
   }
 
   function toggleMetadataAllergen(
     index: number,
     allergen: string
   ) {
-    const metadata = metadataByIndex[index];
+    const metadata =
+      metadataByIndex[index];
 
     if (!metadata) {
       return;
     }
 
     const alreadySelected =
-      metadata.allergens.includes(allergen);
+      metadata.allergens.includes(
+        allergen
+      );
 
-    const allergens = alreadySelected
-      ? metadata.allergens.filter(
-          (item) => item !== allergen
-        )
-      : [...metadata.allergens, allergen];
+    const allergens =
+      alreadySelected
+        ? metadata.allergens.filter(
+            (item) =>
+              item !== allergen
+          )
+        : [
+            ...metadata.allergens,
+            allergen,
+          ];
 
-    updateMetadata(index, { allergens });
+    updateMetadata(index, {
+      allergens,
+    });
   }
 
   async function addFoodToLibrary(
     index: number
   ) {
-    const metadata = metadataByIndex[index];
-    const previewItem = aiPreview[index];
+    const metadata =
+      metadataByIndex[index];
 
-    if (!metadata || !previewItem) {
+    const previewItem =
+      aiPreview[index];
+
+    if (
+      !metadata ||
+      !previewItem
+    ) {
       return;
     }
 
-    if (!metadata.food_name.trim()) {
-      setMessage("Food name is required.");
+    if (
+      !metadata.food_name.trim()
+    ) {
+      setMessage(
+        "Food name is required."
+      );
       return;
     }
 
     setMessage("");
     setAddingIndex(index);
 
-    const aliasSet = new Set(
-      metadata.aliases
-        .map((alias) => alias.trim())
-        .filter(Boolean)
+    const aliasSet =
+      new Set(
+        metadata.aliases
+          .map((alias) =>
+            alias.trim()
+          )
+          .filter(Boolean)
+      );
+
+    if (
+      normalizeFoodName(
+        previewItem.inputName
+      ) !==
+      normalizeFoodName(
+        metadata.food_name
+      )
+    ) {
+      aliasSet.add(
+        previewItem.inputName.trim()
+      );
+    }
+
+    const {
+      data: newFoodId,
+      error,
+    } = await supabase.rpc(
+      "add_food_to_library",
+      {
+        new_food_name:
+          metadata.food_name.trim(),
+
+        new_category:
+          metadata.category.trim() ||
+          null,
+
+        new_subcategory:
+          metadata.subcategory?.trim() ||
+          null,
+
+        new_is_iron_rich:
+          metadata.is_iron_rich,
+
+        new_plant_types:
+          metadata.plant_types
+            .map((plant) =>
+              plant.trim()
+            )
+            .filter(Boolean),
+
+        new_allergens:
+          metadata.allergens,
+
+        new_aliases:
+          Array.from(aliasSet),
+      }
     );
 
     if (
-      normalizeFoodName(previewItem.inputName) !==
-      normalizeFoodName(metadata.food_name)
+      error ||
+      !newFoodId
     ) {
-      aliasSet.add(previewItem.inputName.trim());
-    }
-
-    const { data: newFoodId, error } =
-      await supabase.rpc(
-        "add_food_to_library",
-        {
-          new_food_name:
-            metadata.food_name.trim(),
-
-          new_category:
-            metadata.category.trim() || null,
-
-          new_subcategory:
-            metadata.subcategory?.trim() ||
-            null,
-
-          new_is_iron_rich:
-            metadata.is_iron_rich,
-
-          new_plant_types:
-            metadata.plant_types
-              .map((plant) => plant.trim())
-              .filter(Boolean),
-
-          new_allergens:
-            metadata.allergens,
-
-          new_aliases:
-            Array.from(aliasSet),
-        }
-      );
-
-    if (error || !newFoodId) {
       setMessage(
         error?.message ??
           "Could not add the food to the library."
@@ -760,25 +951,37 @@ export default function Home() {
       return;
     }
 
-    setAiPreview((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index
-          ? {
-              ...item,
-              foodId: newFoodId as string,
-              canonicalName:
-                metadata.food_name.trim(),
-              matched: true,
-            }
-          : item
-      )
+    setAiPreview(
+      (current) =>
+        current.map(
+          (
+            item,
+            itemIndex
+          ) =>
+            itemIndex === index
+              ? {
+                  ...item,
+                  foodId:
+                    newFoodId as string,
+                  canonicalName:
+                    metadata.food_name.trim(),
+                  matched: true,
+                }
+              : item
+        )
     );
 
-    setMetadataByIndex((current) => {
-      const next = { ...current };
-      delete next[index];
-      return next;
-    });
+    setMetadataByIndex(
+      (current) => {
+        const next = {
+          ...current,
+        };
+
+        delete next[index];
+
+        return next;
+      }
+    );
 
     await loadFoodsAndAliases();
 
@@ -792,16 +995,24 @@ export default function Home() {
   async function saveAiFoods() {
     setMessage("");
 
-    if (aiPreview.length === 0) {
-      setMessage("There is nothing to save.");
+    if (
+      aiPreview.length === 0
+    ) {
+      setMessage(
+        "There is nothing to save."
+      );
       return;
     }
 
-    const unmatched = aiPreview.filter(
-      (item) => !item.matched
-    );
+    const unmatched =
+      aiPreview.filter(
+        (item) =>
+          !item.matched
+      );
 
-    if (unmatched.length > 0) {
+    if (
+      unmatched.length > 0
+    ) {
       setMessage(
         "One or more foods still need to be added or matched before saving."
       );
@@ -815,7 +1026,10 @@ export default function Home() {
       error: userError,
     } = await supabase.auth.getUser();
 
-    if (userError || !user) {
+    if (
+      userError ||
+      !user
+    ) {
       setMessage(
         "Could not identify the signed-in user."
       );
@@ -823,21 +1037,30 @@ export default function Home() {
       return;
     }
 
-    const rows = aiPreview.map((item) => ({
-      baby_id: babyId,
-      food_id: item.foodId,
-      preference: item.preference,
-      notes: null,
-      eaten_at: item.eatenAt,
-      recorded_by: user.id,
-    }));
+    const rows =
+      aiPreview.map(
+        (item) => ({
+          baby_id: babyId,
+          food_id: item.foodId,
+          preference:
+            item.preference,
+          notes: null,
+          eaten_at:
+            item.eatenAt,
+          recorded_by:
+            user.id,
+        })
+      );
 
-    const { error } = await supabase
-      .from("food_exposures")
-      .insert(rows);
+    const { error } =
+      await supabase
+        .from("food_exposures")
+        .insert(rows);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(
+        error.message
+      );
       setSavingAi(false);
       return;
     }
@@ -846,10 +1069,18 @@ export default function Home() {
     setAiPreview([]);
     setMetadataByIndex({});
 
-    await loadPlantCount(babyId);
-    await loadIronExposures(babyId);
+    await loadPlantCount(
+      babyId
+    );
 
-    setMessage("Foods saved! ✓");
+    await loadIronExposures(
+      babyId
+    );
+
+    setMessage(
+      "Foods saved! ✓"
+    );
+
     setSavingAi(false);
   }
 
@@ -859,19 +1090,28 @@ export default function Home() {
     setSignedIn(false);
     setBabyId("");
     setBabyName("");
+
     setPlantGoal(null);
     setPlantCount(0);
+    setWeeklyPlantTypes([]);
+    setShowPlantTypes(false);
+
     setIronExposures([]);
+
     setFoods([]);
     setAliases([]);
+
     setAiText("");
     setAiPreview([]);
     setMetadataByIndex({});
+
     setSelectedFoodId("");
     setPreference("");
     setNotes("");
+
     setEmail("");
     setPassword("");
+
     setMessage("");
   }
 
@@ -887,47 +1127,58 @@ export default function Home() {
     return (
       <main
         className="app-shell"
-        style={{ maxWidth: "460px" }}
+        style={{
+          maxWidth: "460px",
+        }}
       >
         <h1 className="page-title">
           Thea&apos;s Food Tracker
         </h1>
 
         <p className="page-subtitle">
-          Sign in to track Thea&apos;s food journey.
+          Sign in to track
+          Thea&apos;s food journey.
         </p>
 
         <section className="card">
           <label className="label">
             Email
+
             <input
               className="field"
               type="email"
               placeholder="Email"
               value={email}
               onChange={(e) =>
-                setEmail(e.target.value)
+                setEmail(
+                  e.target.value
+                )
               }
               style={{
                 marginTop: "8px",
-                marginBottom: "16px",
+                marginBottom:
+                  "16px",
               }}
             />
           </label>
 
           <label className="label">
             Password
+
             <input
               className="field"
               type="password"
               placeholder="Password"
               value={password}
               onChange={(e) =>
-                setPassword(e.target.value)
+                setPassword(
+                  e.target.value
+                )
               }
               style={{
                 marginTop: "8px",
-                marginBottom: "18px",
+                marginBottom:
+                  "18px",
               }}
             />
           </label>
@@ -955,12 +1206,15 @@ export default function Home() {
   return (
     <main className="app-shell">
       <h1 className="page-title">
-        {babyName || "Thea"}&apos;s Food Tracker
+        {babyName ||
+          "Thea"}
+        &apos;s Food Tracker
       </h1>
 
       <p className="page-subtitle">
-        A simple place to track foods,
-        preferences, plants, and allergens.
+        A simple place to track
+        foods, preferences, plants,
+        and allergens.
       </p>
 
       <nav className="nav-card">
@@ -992,22 +1246,75 @@ export default function Home() {
         </h2>
 
         <p className="big-number">
-          {plantCount} / {plantGoal ?? 25}
+          {plantCount} /{" "}
+          {plantGoal ?? 25}
         </p>
 
-        <p
-          className="muted"
-          style={{ marginBottom: 0 }}
-        >
+        <p className="muted">
           different plant types
         </p>
+
+        {plantCount > 0 && (
+          <>
+            <button
+              className="secondary-button"
+              onClick={() =>
+                setShowPlantTypes(
+                  !showPlantTypes
+                )
+              }
+              style={{
+                marginTop: "4px",
+              }}
+            >
+              {showPlantTypes
+                ? "Hide plant types ▴"
+                : "View plant types ▾"}
+            </button>
+
+            {showPlantTypes && (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                  marginTop: "16px",
+                }}
+              >
+                {weeklyPlantTypes.map(
+                  (plantType) => (
+                    <span
+                      key={plantType}
+                      style={{
+                        background:
+                          "white",
+                        border:
+                          "1px solid var(--border)",
+                        borderRadius:
+                          "999px",
+                        padding:
+                          "7px 11px",
+                        fontSize:
+                          "14px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      🌿 {plantType}
+                    </span>
+                  )
+                )}
+              </div>
+            )}
+          </>
+        )}
       </section>
 
       <section className="card">
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
+            justifyContent:
+              "space-between",
             alignItems: "center",
             gap: "16px",
             flexWrap: "wrap",
@@ -1016,7 +1323,9 @@ export default function Home() {
         >
           <h2
             className="section-title"
-            style={{ marginBottom: 0 }}
+            style={{
+              marginBottom: 0,
+            }}
           >
             ✨ Add Food
           </h2>
@@ -1031,7 +1340,9 @@ export default function Home() {
               fontSize: "14px",
             }}
           >
-            <span>Add Food Manually</span>
+            <span>
+              Add Food Manually
+            </span>
 
             <input
               type="checkbox"
@@ -1040,6 +1351,7 @@ export default function Home() {
                 setManualMode(
                   e.target.checked
                 );
+
                 setMessage("");
               }}
               style={{
@@ -1054,18 +1366,24 @@ export default function Home() {
         {!manualMode ? (
           <>
             <p className="muted">
-              Tell me what Thea ate in your own
-              words. Nothing is saved until you
-              review it.
+              Tell me what Thea ate
+              in your own words.
+              Nothing is saved until
+              you review it.
             </p>
 
             <textarea
               className="textarea-field"
               value={aiText}
               onChange={(e) => {
-                setAiText(e.target.value);
+                setAiText(
+                  e.target.value
+                );
+
                 setAiPreview([]);
-                setMetadataByIndex({});
+                setMetadataByIndex(
+                  {}
+                );
               }}
               maxLength={1000}
               placeholder="Example: Yesterday Thea had banana and Greek yogurt. She loved the banana."
@@ -1073,7 +1391,9 @@ export default function Home() {
 
             <button
               className="primary-button"
-              onClick={parseAiEntry}
+              onClick={
+                parseAiEntry
+              }
               disabled={parsingAi}
             >
               {parsingAi
@@ -1081,17 +1401,23 @@ export default function Home() {
                 : "Review entry"}
             </button>
 
-            {aiPreview.length > 0 && (
+            {aiPreview.length >
+              0 && (
               <div
-                style={{ marginTop: "24px" }}
+                style={{
+                  marginTop:
+                    "24px",
+                }}
               >
                 <h3
                   style={{
                     fontFamily:
                       'Georgia, "Times New Roman", serif',
-                    fontSize: "22px",
+                    fontSize:
+                      "22px",
                     marginTop: 0,
-                    marginBottom: "14px",
+                    marginBottom:
+                      "14px",
                   }}
                 >
                   Review foods
@@ -1099,15 +1425,22 @@ export default function Home() {
 
                 <div
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
+                    display:
+                      "flex",
+                    flexDirection:
+                      "column",
                     gap: "12px",
                   }}
                 >
                   {aiPreview.map(
-                    (item, index) => {
+                    (
+                      item,
+                      index
+                    ) => {
                       const metadata =
-                        metadataByIndex[index];
+                        metadataByIndex[
+                          index
+                        ];
 
                       return (
                         <div
@@ -1115,9 +1448,12 @@ export default function Home() {
                           style={{
                             border:
                               "1px solid var(--border)",
-                            borderRadius: "14px",
-                            padding: "14px",
-                            background: "white",
+                            borderRadius:
+                              "14px",
+                            padding:
+                              "14px",
+                            background:
+                              "white",
                           }}
                         >
                           {item.matched ? (
@@ -1161,7 +1497,9 @@ export default function Home() {
                             <>
                               <strong>
                                 ⚠️{" "}
-                                {item.inputName}
+                                {
+                                  item.inputName
+                                }
                               </strong>
 
                               <p
@@ -1216,8 +1554,7 @@ export default function Home() {
                                         "18px",
                                     }}
                                   >
-                                    Review food
-                                    details
+                                    Review food details
                                   </h4>
 
                                   <label className="label">
@@ -1368,7 +1705,8 @@ export default function Home() {
                                       gap: "9px",
                                       marginBottom:
                                         "16px",
-                                      fontWeight: 600,
+                                      fontWeight:
+                                        600,
                                     }}
                                   >
                                     <input
@@ -1391,8 +1729,7 @@ export default function Home() {
                                       }
                                     />
 
-                                    Iron-rich
-                                    food
+                                    Iron-rich food
                                   </label>
 
                                   <div
@@ -1531,12 +1868,15 @@ export default function Home() {
                     display: "flex",
                     gap: "10px",
                     flexWrap: "wrap",
-                    marginTop: "18px",
+                    marginTop:
+                      "18px",
                   }}
                 >
                   <button
                     className="primary-button"
-                    onClick={saveAiFoods}
+                    onClick={
+                      saveAiFoods
+                    }
                     disabled={
                       savingAi ||
                       aiPreview.some(
@@ -1553,8 +1893,13 @@ export default function Home() {
                   <button
                     className="secondary-button"
                     onClick={() => {
-                      setAiPreview([]);
-                      setMetadataByIndex({});
+                      setAiPreview(
+                        []
+                      );
+
+                      setMetadataByIndex(
+                        {}
+                      );
                     }}
                     disabled={savingAi}
                   >
@@ -1571,7 +1916,9 @@ export default function Home() {
 
               <select
                 className="select-field"
-                value={selectedFoodId}
+                value={
+                  selectedFoodId
+                }
                 onChange={(e) =>
                   setSelectedFoodId(
                     e.target.value
@@ -1585,10 +1932,16 @@ export default function Home() {
                 {dropdownFoods.map(
                   (food) => (
                     <option
-                      key={food.id}
-                      value={food.id}
+                      key={
+                        food.id
+                      }
+                      value={
+                        food.id
+                      }
                     >
-                      {food.name}
+                      {
+                        food.name
+                      }
                     </option>
                   )
                 )}
@@ -1610,15 +1963,19 @@ export default function Home() {
                 <option value="">
                   Not recorded
                 </option>
+
                 <option value="loved">
                   Loved ❤️
                 </option>
+
                 <option value="liked">
                   Liked 🙂
                 </option>
+
                 <option value="neutral">
                   Neutral 😐
                 </option>
+
                 <option value="disliked">
                   Didn&apos;t like 🙅‍♀️
                 </option>
@@ -1632,7 +1989,9 @@ export default function Home() {
                 className="textarea-field"
                 value={notes}
                 onChange={(e) =>
-                  setNotes(e.target.value)
+                  setNotes(
+                    e.target.value
+                  )
                 }
                 placeholder="Optional notes"
               />
@@ -1640,7 +1999,9 @@ export default function Home() {
 
             <button
               className="primary-button"
-              onClick={saveFoodExposure}
+              onClick={
+                saveFoodExposure
+              }
               disabled={savingFood}
             >
               {savingFood
@@ -1664,10 +2025,13 @@ export default function Home() {
 
         <p
           className="muted"
-          style={{ marginBottom: 0 }}
+          style={{
+            marginBottom: 0,
+          }}
         >
-          At least one safe food, no more than
-          one new food, with repeat exposure
+          At least one safe food,
+          no more than one new food,
+          with repeat exposure
           encouraged.
         </p>
       </section>
@@ -1678,8 +2042,9 @@ export default function Home() {
         </h2>
 
         <p className="muted">
-          Thea&apos;s iron-rich foods over the
-          past 7 days.
+          Thea&apos;s iron-rich
+          foods over the past 7
+          days.
         </p>
 
         <div
@@ -1692,12 +2057,15 @@ export default function Home() {
         >
           <button
             className={
-              ironView === "calendar"
+              ironView ===
+              "calendar"
                 ? "primary-button"
                 : "secondary-button"
             }
             onClick={() =>
-              setIronView("calendar")
+              setIronView(
+                "calendar"
+              )
             }
           >
             📅 Calendar
@@ -1717,7 +2085,8 @@ export default function Home() {
           </button>
         </div>
 
-        {ironView === "calendar" && (
+        {ironView ===
+          "calendar" && (
           <div
             style={{
               display: "grid",
@@ -1726,62 +2095,83 @@ export default function Home() {
               gap: "10px",
             }}
           >
-            {lastSevenDays.map((day) => (
-              <div
-                key={day.dateString}
-                style={{
-                  background: "white",
-                  border:
-                    "1px solid var(--border)",
-                  borderRadius: "14px",
-                  padding: "14px 8px",
-                  textAlign: "center",
-                }}
-              >
-                <strong
+            {lastSevenDays.map(
+              (day) => (
+                <div
+                  key={
+                    day.dateString
+                  }
                   style={{
-                    display: "block",
-                    marginBottom: "4px",
+                    background:
+                      "white",
+                    border:
+                      "1px solid var(--border)",
+                    borderRadius:
+                      "14px",
+                    padding:
+                      "14px 8px",
+                    textAlign:
+                      "center",
                   }}
                 >
-                  {day.weekday}
-                </strong>
+                  <strong
+                    style={{
+                      display:
+                        "block",
+                      marginBottom:
+                        "4px",
+                    }}
+                  >
+                    {
+                      day.weekday
+                    }
+                  </strong>
 
-                <span
-                  className="muted"
-                  style={{
-                    display: "block",
-                    fontSize: "14px",
-                    marginBottom: "10px",
-                  }}
-                >
-                  {day.dateLabel}
-                </span>
+                  <span
+                    className="muted"
+                    style={{
+                      display:
+                        "block",
+                      fontSize:
+                        "14px",
+                      marginBottom:
+                        "10px",
+                    }}
+                  >
+                    {
+                      day.dateLabel
+                    }
+                  </span>
 
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "25px",
-                    marginBottom: "5px",
-                  }}
-                >
-                  {day.hadIron
-                    ? "✅"
-                    : "—"}
-                </span>
+                  <span
+                    style={{
+                      display:
+                        "block",
+                      fontSize:
+                        "25px",
+                      marginBottom:
+                        "5px",
+                    }}
+                  >
+                    {day.hadIron
+                      ? "✅"
+                      : "—"}
+                  </span>
 
-                <span
-                  className="muted"
-                  style={{
-                    fontSize: "12px",
-                  }}
-                >
-                  {day.hadIron
-                    ? "Iron-rich"
-                    : "None"}
-                </span>
-              </div>
-            ))}
+                  <span
+                    className="muted"
+                    style={{
+                      fontSize:
+                        "12px",
+                    }}
+                  >
+                    {day.hadIron
+                      ? "Iron-rich"
+                      : "None"}
+                  </span>
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -1795,13 +2185,15 @@ export default function Home() {
                   marginBottom: 0,
                 }}
               >
-                No iron-rich foods recorded in
-                the past 7 days.
+                No iron-rich foods
+                recorded in the past
+                7 days.
               </p>
             ) : (
               <div
                 style={{
-                  display: "flex",
+                  display:
+                    "flex",
                   flexDirection:
                     "column",
                   gap: "10px",
@@ -1810,14 +2202,18 @@ export default function Home() {
                 {ironExposures.map(
                   (exposure) => (
                     <div
-                      key={exposure.id}
+                      key={
+                        exposure.id
+                      }
                       style={{
-                        display: "flex",
+                        display:
+                          "flex",
                         justifyContent:
                           "space-between",
                         alignItems:
                           "center",
-                        gap: "16px",
+                        gap:
+                          "16px",
                         paddingBottom:
                           "10px",
                         borderBottom:
@@ -1853,7 +2249,9 @@ export default function Home() {
       <button
         className="secondary-button"
         onClick={signOut}
-        style={{ marginTop: "24px" }}
+        style={{
+          marginTop: "24px",
+        }}
       >
         Sign out
       </button>

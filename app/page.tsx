@@ -47,6 +47,14 @@ type FoodMetadata = {
   aliases: string[];
 };
 
+type MealIdea = {
+  title: string;
+  foods: string[];
+  why_it_works: string;
+  new_food: string | null;
+  iron_rich: boolean;
+};
+
 const APPROVED_ALLERGENS = [
   "Milk",
   "Egg",
@@ -98,6 +106,10 @@ export default function Home() {
 
   const [addingIndex, setAddingIndex] =
     useState<number | null>(null);
+
+  const [mealIdeas, setMealIdeas] = useState<MealIdea[]>([]);
+  const [loadingMealIdeas, setLoadingMealIdeas] = useState(false);
+  const [mealIdeasMessage, setMealIdeasMessage] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
@@ -193,11 +205,7 @@ export default function Home() {
     }
 
     const foodIds = [
-      ...new Set(
-        (exposures ?? []).map(
-          (exposure) => exposure.food_id
-        )
-      ),
+      ...new Set((exposures ?? []).map((exposure) => exposure.food_id)),
     ];
 
     if (foodIds.length === 0) {
@@ -218,11 +226,7 @@ export default function Home() {
     }
 
     const plantTypeIds = [
-      ...new Set(
-        (mappings ?? []).map(
-          (mapping) => mapping.plant_type_id
-        )
-      ),
+      ...new Set((mappings ?? []).map((mapping) => mapping.plant_type_id)),
     ];
 
     setPlantCount(plantTypeIds.length);
@@ -245,15 +249,11 @@ export default function Home() {
     }
 
     setWeeklyPlantTypes(
-      (plantTypes ?? []).map(
-        (plantType) => plantType.name
-      )
+      (plantTypes ?? []).map((plantType) => plantType.name)
     );
   }
 
-  async function loadIronExposures(
-    currentBabyId: string
-  ) {
+  async function loadIronExposures(currentBabyId: string) {
     const cutoff = getSevenDayCutoff();
 
     const { data: ironFoods, error: ironFoodsError } =
@@ -272,32 +272,21 @@ export default function Home() {
       return;
     }
 
-    const ironFoodIds = ironFoods.map(
-      (food) => food.id
-    );
+    const ironFoodIds = ironFoods.map((food) => food.id);
 
     const ironFoodNameMap = new Map(
-      ironFoods.map((food) => [
-        food.id,
-        food.name,
-      ])
+      ironFoods.map((food) => [food.id, food.name])
     );
 
     const { data: exposures, error: exposureError } =
       await supabase
         .from("food_exposures")
-        .select(
-          "id, food_id, eaten_at, created_at"
-        )
+        .select("id, food_id, eaten_at, created_at")
         .eq("baby_id", currentBabyId)
         .gte("eaten_at", cutoff)
         .in("food_id", ironFoodIds)
-        .order("eaten_at", {
-          ascending: false,
-        })
-        .order("created_at", {
-          ascending: false,
-        });
+        .order("eaten_at", { ascending: false })
+        .order("created_at", { ascending: false });
 
     if (exposureError) {
       setMessage(exposureError.message);
@@ -305,20 +294,14 @@ export default function Home() {
     }
 
     const recentIronExposures: IronExposure[] =
-      (exposures ?? []).map(
-        (exposure) => ({
-          id: exposure.id,
-          foodName:
-            ironFoodNameMap.get(
-              exposure.food_id
-            ) ?? "Unknown food",
-          eatenAt: exposure.eaten_at,
-        })
-      );
+      (exposures ?? []).map((exposure) => ({
+        id: exposure.id,
+        foodName:
+          ironFoodNameMap.get(exposure.food_id) ?? "Unknown food",
+        eatenAt: exposure.eaten_at,
+      }));
 
-    setIronExposures(
-      recentIronExposures
-    );
+    setIronExposures(recentIronExposures);
   }
 
   async function loadBabyData() {
@@ -331,8 +314,7 @@ export default function Home() {
 
     if (babyError || !baby) {
       setMessage(
-        babyError?.message ??
-          "Could not find Thea's baby record."
+        babyError?.message ?? "Could not find Thea's baby record."
       );
       return;
     }
@@ -348,15 +330,11 @@ export default function Home() {
         .single();
 
     if (settingsError) {
-      setMessage(
-        settingsError.message
-      );
+      setMessage(settingsError.message);
       return;
     }
 
-    setPlantGoal(
-      settings.weekly_plant_goal
-    );
+    setPlantGoal(settings.weekly_plant_goal);
 
     await loadPlantCount(baby.id);
     await loadIronExposures(baby.id);
@@ -366,9 +344,7 @@ export default function Home() {
     const { data: foodData, error: foodError } =
       await supabase
         .from("foods")
-        .select(
-          "id, name, show_in_dropdown"
-        )
+        .select("id, name, show_in_dropdown")
         .order("name");
 
     if (foodError) {
@@ -386,13 +362,8 @@ export default function Home() {
       return;
     }
 
-    setFoods(
-      (foodData ?? []) as Food[]
-    );
-
-    setAliases(
-      (aliasData ?? []) as Alias[]
-    );
+    setFoods((foodData ?? []) as Food[]);
+    setAliases((aliasData ?? []) as Alias[]);
   }
 
   useEffect(() => {
@@ -400,8 +371,7 @@ export default function Home() {
       const {
         data: { session },
         error,
-      } =
-        await supabase.auth.getSession();
+      } = await supabase.auth.getSession();
 
       if (error) {
         setMessage(error.message);
@@ -423,9 +393,7 @@ export default function Home() {
   }, []);
 
   const dropdownFoods = useMemo(() => {
-    return foods.filter(
-      (food) => food.show_in_dropdown
-    );
+    return foods.filter((food) => food.show_in_dropdown);
   }, [foods]);
 
   const lastSevenDays = useMemo(() => {
@@ -435,37 +403,23 @@ export default function Home() {
       const date = new Date();
 
       date.setHours(0, 0, 0, 0);
-      date.setDate(
-        date.getDate() - i
+      date.setDate(date.getDate() - i);
+
+      const dateString = getLocalDateString(date);
+
+      const hadIron = ironExposures.some(
+        (exposure) => exposure.eatenAt === dateString
       );
-
-      const dateString =
-        getLocalDateString(date);
-
-      const hadIron =
-        ironExposures.some(
-          (exposure) =>
-            exposure.eatenAt ===
-            dateString
-        );
 
       days.push({
         dateString,
-        weekday:
-          date.toLocaleDateString(
-            "en-US",
-            {
-              weekday: "short",
-            }
-          ),
-        dateLabel:
-          date.toLocaleDateString(
-            "en-US",
-            {
-              month: "short",
-              day: "numeric",
-            }
-          ),
+        weekday: date.toLocaleDateString("en-US", {
+          weekday: "short",
+        }),
+        dateLabel: date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
         hadIron,
       });
     }
@@ -478,12 +432,10 @@ export default function Home() {
     setMessage("");
 
     const { error } =
-      await supabase.auth.signInWithPassword(
-        {
-          email,
-          password,
-        }
-      );
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
     if (error) {
       setMessage(error.message);
@@ -503,9 +455,7 @@ export default function Home() {
     setMessage("");
 
     if (!selectedFoodId) {
-      setMessage(
-        "Please choose a food."
-      );
+      setMessage("Please choose a food.");
       return;
     }
 
@@ -517,9 +467,7 @@ export default function Home() {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      setMessage(
-        "Could not identify the signed-in user."
-      );
+      setMessage("Could not identify the signed-in user.");
       setSavingFood(false);
       return;
     }
@@ -530,8 +478,7 @@ export default function Home() {
         .insert({
           baby_id: babyId,
           food_id: selectedFoodId,
-          preference:
-            preference || null,
+          preference: preference || null,
           notes: notes || null,
           recorded_by: user.id,
         });
@@ -547,9 +494,7 @@ export default function Home() {
     setNotes("");
 
     await loadPlantCount(babyId);
-    await loadIronExposures(
-      babyId
-    );
+    await loadIronExposures(babyId);
 
     setMessage("Food saved! ✓");
     setSavingFood(false);
@@ -561,9 +506,7 @@ export default function Home() {
     setMetadataByIndex({});
 
     if (!aiText.trim()) {
-      setMessage(
-        "Type what Thea ate first."
-      );
+      setMessage("Type what Thea ate first.");
       return;
     }
 
@@ -573,143 +516,89 @@ export default function Home() {
       const {
         data: { session },
         error: sessionError,
-      } =
-        await supabase.auth.getSession();
+      } = await supabase.auth.getSession();
 
-      if (
-        sessionError ||
-        !session
-      ) {
-        setMessage(
-          "Your sign-in session could not be found."
-        );
+      if (sessionError || !session) {
+        setMessage("Your sign-in session could not be found.");
         return;
       }
 
-      const response = await fetch(
-        "/api/parse-food",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            text: aiText,
-            today:
-              getLocalDateString(
-                new Date()
-              ),
-          }),
-        }
-      );
+      const response = await fetch("/api/parse-food", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          text: aiText,
+          today: getLocalDateString(new Date()),
+        }),
+      });
 
-      const result =
-        await response.json();
+      const result = await response.json();
 
       if (!response.ok) {
         setMessage(
-          result.error ??
-            "Could not understand the food entry."
+          result.error ?? "Could not understand the food entry."
         );
         return;
       }
 
-      const parsedFoods =
-        (result.foods ??
-          []) as ParsedFood[];
+      const parsedFoods = (result.foods ?? []) as ParsedFood[];
 
-      if (
-        parsedFoods.length === 0
-      ) {
+      if (parsedFoods.length === 0) {
         setMessage(
           "I couldn't find any foods Thea ate in that entry."
         );
         return;
       }
 
-      const canonicalMap =
-        new Map(
-          foods.map((food) => [
-            normalizeFoodName(
-              food.name
-            ),
-            food,
-          ])
-        );
-
-      const foodById =
-        new Map(
-          foods.map((food) => [
-            food.id,
-            food,
-          ])
-        );
-
-      const aliasMap =
-        new Map<string, Food>();
-
-      aliases.forEach(
-        (alias) => {
-          const matchingFood =
-            foodById.get(
-              alias.food_id
-            );
-
-          if (matchingFood) {
-            aliasMap.set(
-              normalizeFoodName(
-                alias.alias
-              ),
-              matchingFood
-            );
-          }
-        }
+      const canonicalMap = new Map(
+        foods.map((food) => [
+          normalizeFoodName(food.name),
+          food,
+        ])
       );
 
-      const preview:
-        PreviewFood[] =
-        parsedFoods.map(
-          (parsed) => {
-            const normalized =
-              normalizeFoodName(
-                parsed.food
-              );
+      const foodById = new Map(
+        foods.map((food) => [food.id, food])
+      );
 
-            const canonicalMatch =
-              canonicalMap.get(
-                normalized
-              );
+      const aliasMap = new Map<string, Food>();
 
-            const aliasMatch =
-              aliasMap.get(
-                normalized
-              );
+      aliases.forEach((alias) => {
+        const matchingFood = foodById.get(alias.food_id);
 
-            const match =
-              canonicalMatch ??
-              aliasMatch ??
-              null;
+        if (matchingFood) {
+          aliasMap.set(
+            normalizeFoodName(alias.alias),
+            matchingFood
+          );
+        }
+      });
 
-            return {
-              inputName:
-                parsed.food,
-              foodId:
-                match?.id ??
-                null,
-              canonicalName:
-                match?.name ??
-                null,
-              preference:
-                parsed.preference,
-              eatenAt:
-                parsed.eaten_at,
-              matched:
-                Boolean(match),
-            };
-          }
-        );
+      const preview: PreviewFood[] =
+        parsedFoods.map((parsed) => {
+          const normalized = normalizeFoodName(parsed.food);
+
+          const canonicalMatch =
+            canonicalMap.get(normalized);
+
+          const aliasMatch =
+            aliasMap.get(normalized);
+
+          const match =
+            canonicalMatch ?? aliasMatch ?? null;
+
+          return {
+            inputName: parsed.food,
+            foodId: match?.id ?? null,
+            canonicalName: match?.name ?? null,
+            preference: parsed.preference,
+            eatenAt: parsed.eaten_at,
+            matched: Boolean(match),
+          };
+        });
 
       setAiPreview(preview);
     } catch {
@@ -721,16 +610,10 @@ export default function Home() {
     }
   }
 
-  async function suggestFoodMetadata(
-    index: number
-  ) {
-    const item =
-      aiPreview[index];
+  async function suggestFoodMetadata(index: number) {
+    const item = aiPreview[index];
 
-    if (
-      !item ||
-      item.matched
-    ) {
+    if (!item || item.matched) {
       return;
     }
 
@@ -741,16 +624,10 @@ export default function Home() {
       const {
         data: { session },
         error: sessionError,
-      } =
-        await supabase.auth.getSession();
+      } = await supabase.auth.getSession();
 
-      if (
-        sessionError ||
-        !session
-      ) {
-        setMessage(
-          "Your sign-in session could not be found."
-        );
+      if (sessionError || !session) {
+        setMessage("Your sign-in session could not be found.");
         return;
       }
 
@@ -759,35 +636,28 @@ export default function Home() {
         {
           method: "POST",
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            food_name:
-              item.inputName,
+            food_name: item.inputName,
           }),
         }
       );
 
-      const result =
-        await response.json();
+      const result = await response.json();
 
       if (!response.ok) {
         setMessage(
-          result.error ??
-            "Could not suggest food information."
+          result.error ?? "Could not suggest food information."
         );
         return;
       }
 
-      setMetadataByIndex(
-        (current) => ({
-          ...current,
-          [index]:
-            result as FoodMetadata,
-        })
-      );
+      setMetadataByIndex((current) => ({
+        ...current,
+        [index]: result as FoodMetadata,
+      }));
     } catch {
       setMessage(
         "Something went wrong while preparing the new food."
@@ -799,83 +669,60 @@ export default function Home() {
 
   function updateMetadata(
     index: number,
-    updates:
-      Partial<FoodMetadata>
+    updates: Partial<FoodMetadata>
   ) {
-    setMetadataByIndex(
-      (current) => {
-        const existing =
-          current[index];
+    setMetadataByIndex((current) => {
+      const existing = current[index];
 
-        if (!existing) {
-          return current;
-        }
-
-        return {
-          ...current,
-          [index]: {
-            ...existing,
-            ...updates,
-          },
-        };
+      if (!existing) {
+        return current;
       }
-    );
+
+      return {
+        ...current,
+        [index]: {
+          ...existing,
+          ...updates,
+        },
+      };
+    });
   }
 
   function toggleMetadataAllergen(
     index: number,
     allergen: string
   ) {
-    const metadata =
-      metadataByIndex[index];
+    const metadata = metadataByIndex[index];
 
     if (!metadata) {
       return;
     }
 
     const alreadySelected =
-      metadata.allergens.includes(
-        allergen
-      );
+      metadata.allergens.includes(allergen);
 
     const allergens =
       alreadySelected
         ? metadata.allergens.filter(
-            (item) =>
-              item !== allergen
+            (item) => item !== allergen
           )
-        : [
-            ...metadata.allergens,
-            allergen,
-          ];
+        : [...metadata.allergens, allergen];
 
     updateMetadata(index, {
       allergens,
     });
   }
 
-  async function addFoodToLibrary(
-    index: number
-  ) {
-    const metadata =
-      metadataByIndex[index];
+  async function addFoodToLibrary(index: number) {
+    const metadata = metadataByIndex[index];
+    const previewItem = aiPreview[index];
 
-    const previewItem =
-      aiPreview[index];
-
-    if (
-      !metadata ||
-      !previewItem
-    ) {
+    if (!metadata || !previewItem) {
       return;
     }
 
-    if (
-      !metadata.food_name.trim()
-    ) {
-      setMessage(
-        "Food name is required."
-      );
+    if (!metadata.food_name.trim()) {
+      setMessage("Food name is required.");
       return;
     }
 
@@ -885,23 +732,15 @@ export default function Home() {
     const aliasSet =
       new Set(
         metadata.aliases
-          .map((alias) =>
-            alias.trim()
-          )
+          .map((alias) => alias.trim())
           .filter(Boolean)
       );
 
     if (
-      normalizeFoodName(
-        previewItem.inputName
-      ) !==
-      normalizeFoodName(
-        metadata.food_name
-      )
+      normalizeFoodName(previewItem.inputName) !==
+      normalizeFoodName(metadata.food_name)
     ) {
-      aliasSet.add(
-        previewItem.inputName.trim()
-      );
+      aliasSet.add(previewItem.inputName.trim());
     }
 
     const {
@@ -910,39 +749,25 @@ export default function Home() {
     } = await supabase.rpc(
       "add_food_to_library",
       {
-        new_food_name:
-          metadata.food_name.trim(),
-
+        new_food_name: metadata.food_name.trim(),
         new_category:
-          metadata.category.trim() ||
-          null,
-
+          metadata.category.trim() || null,
         new_subcategory:
-          metadata.subcategory?.trim() ||
-          null,
-
+          metadata.subcategory?.trim() || null,
         new_is_iron_rich:
           metadata.is_iron_rich,
-
         new_plant_types:
           metadata.plant_types
-            .map((plant) =>
-              plant.trim()
-            )
+            .map((plant) => plant.trim())
             .filter(Boolean),
-
         new_allergens:
           metadata.allergens,
-
         new_aliases:
           Array.from(aliasSet),
       }
     );
 
-    if (
-      error ||
-      !newFoodId
-    ) {
+    if (error || !newFoodId) {
       setMessage(
         error?.message ??
           "Could not add the food to the library."
@@ -951,37 +776,27 @@ export default function Home() {
       return;
     }
 
-    setAiPreview(
-      (current) =>
-        current.map(
-          (
-            item,
-            itemIndex
-          ) =>
-            itemIndex === index
-              ? {
-                  ...item,
-                  foodId:
-                    newFoodId as string,
-                  canonicalName:
-                    metadata.food_name.trim(),
-                  matched: true,
-                }
-              : item
-        )
+    setAiPreview((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              foodId: newFoodId as string,
+              canonicalName:
+                metadata.food_name.trim(),
+              matched: true,
+            }
+          : item
+      )
     );
 
-    setMetadataByIndex(
-      (current) => {
-        const next = {
-          ...current,
-        };
+    setMetadataByIndex((current) => {
+      const next = { ...current };
 
-        delete next[index];
+      delete next[index];
 
-        return next;
-      }
-    );
+      return next;
+    });
 
     await loadFoodsAndAliases();
 
@@ -995,24 +810,15 @@ export default function Home() {
   async function saveAiFoods() {
     setMessage("");
 
-    if (
-      aiPreview.length === 0
-    ) {
-      setMessage(
-        "There is nothing to save."
-      );
+    if (aiPreview.length === 0) {
+      setMessage("There is nothing to save.");
       return;
     }
 
     const unmatched =
-      aiPreview.filter(
-        (item) =>
-          !item.matched
-      );
+      aiPreview.filter((item) => !item.matched);
 
-    if (
-      unmatched.length > 0
-    ) {
+    if (unmatched.length > 0) {
       setMessage(
         "One or more foods still need to be added or matched before saving."
       );
@@ -1026,31 +832,21 @@ export default function Home() {
       error: userError,
     } = await supabase.auth.getUser();
 
-    if (
-      userError ||
-      !user
-    ) {
-      setMessage(
-        "Could not identify the signed-in user."
-      );
+    if (userError || !user) {
+      setMessage("Could not identify the signed-in user.");
       setSavingAi(false);
       return;
     }
 
     const rows =
-      aiPreview.map(
-        (item) => ({
-          baby_id: babyId,
-          food_id: item.foodId,
-          preference:
-            item.preference,
-          notes: null,
-          eaten_at:
-            item.eatenAt,
-          recorded_by:
-            user.id,
-        })
-      );
+      aiPreview.map((item) => ({
+        baby_id: babyId,
+        food_id: item.foodId,
+        preference: item.preference,
+        notes: null,
+        eaten_at: item.eatenAt,
+        recorded_by: user.id,
+      }));
 
     const { error } =
       await supabase
@@ -1058,9 +854,7 @@ export default function Home() {
         .insert(rows);
 
     if (error) {
-      setMessage(
-        error.message
-      );
+      setMessage(error.message);
       setSavingAi(false);
       return;
     }
@@ -1069,19 +863,66 @@ export default function Home() {
     setAiPreview([]);
     setMetadataByIndex({});
 
-    await loadPlantCount(
-      babyId
-    );
+    await loadPlantCount(babyId);
+    await loadIronExposures(babyId);
 
-    await loadIronExposures(
-      babyId
-    );
-
-    setMessage(
-      "Foods saved! ✓"
-    );
-
+    setMessage("Foods saved! ✓");
     setSavingAi(false);
+  }
+
+  async function generateMealIdeas() {
+    setMealIdeasMessage("");
+    setMealIdeas([]);
+    setLoadingMealIdeas(true);
+
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        setMealIdeasMessage(
+          "Your sign-in session could not be found."
+        );
+        return;
+      }
+
+      const response = await fetch("/api/meal-ideas", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          count: 3,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMealIdeasMessage(
+          result.error ?? "Could not generate meal ideas."
+        );
+        return;
+      }
+
+      if (!Array.isArray(result.meals)) {
+        setMealIdeasMessage(
+          "The meal ideas response was not valid."
+        );
+        return;
+      }
+
+      setMealIdeas(result.meals as MealIdea[]);
+    } catch {
+      setMealIdeasMessage(
+        "Something went wrong while generating meal ideas."
+      );
+    } finally {
+      setLoadingMealIdeas(false);
+    }
   }
 
   async function signOut() {
@@ -1104,6 +945,9 @@ export default function Home() {
     setAiText("");
     setAiPreview([]);
     setMetadataByIndex({});
+
+    setMealIdeas([]);
+    setMealIdeasMessage("");
 
     setSelectedFoodId("");
     setPreference("");
@@ -1136,8 +980,7 @@ export default function Home() {
         </h1>
 
         <p className="page-subtitle">
-          Sign in to track
-          Thea&apos;s food journey.
+          Sign in to track Thea&apos;s food journey.
         </p>
 
         <section className="card">
@@ -1150,14 +993,11 @@ export default function Home() {
               placeholder="Email"
               value={email}
               onChange={(e) =>
-                setEmail(
-                  e.target.value
-                )
+                setEmail(e.target.value)
               }
               style={{
                 marginTop: "8px",
-                marginBottom:
-                  "16px",
+                marginBottom: "16px",
               }}
             />
           </label>
@@ -1171,14 +1011,11 @@ export default function Home() {
               placeholder="Password"
               value={password}
               onChange={(e) =>
-                setPassword(
-                  e.target.value
-                )
+                setPassword(e.target.value)
               }
               style={{
                 marginTop: "8px",
-                marginBottom:
-                  "18px",
+                marginBottom: "18px",
               }}
             />
           </label>
@@ -1206,14 +1043,12 @@ export default function Home() {
   return (
     <main className="app-shell">
       <h1 className="page-title">
-        {babyName ||
-          "Thea"}
+        {babyName || "Thea"}
         &apos;s Food Tracker
       </h1>
 
       <p className="page-subtitle">
-        A simple place to track
-        foods, preferences, plants,
+        A simple place to track foods, preferences, plants,
         and allergens.
       </p>
 
@@ -1241,100 +1076,101 @@ export default function Home() {
       </nav>
 
       <section className="card green">
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: "16px",
-      flexWrap: "wrap",
-      marginBottom: "14px",
-    }}
-  >
-    <h2
-      className="section-title"
-      style={{ marginBottom: 0 }}
-    >
-      🌱 This Week
-    </h2>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "16px",
+            flexWrap: "wrap",
+            marginBottom: "14px",
+          }}
+        >
+          <h2
+            className="section-title"
+            style={{ marginBottom: 0 }}
+          >
+            🌱 This Week
+          </h2>
 
-    <label
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "9px",
-        cursor: "pointer",
-        fontWeight: 600,
-        fontSize: "14px",
-      }}
-    >
-      <span>View Plant Types</span>
-
-      <input
-        type="checkbox"
-        checked={showPlantTypes}
-        onChange={(e) =>
-          setShowPlantTypes(e.target.checked)
-        }
-        style={{
-          width: "18px",
-          height: "18px",
-          cursor: "pointer",
-        }}
-      />
-    </label>
-  </div>
-
-  <p className="big-number">
-    {plantCount} / {plantGoal ?? 25}
-  </p>
-
-  <p
-    className="muted"
-    style={{ marginBottom: showPlantTypes ? "16px" : 0 }}
-  >
-    different plant types
-  </p>
-
-  {showPlantTypes && (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: "8px",
-      }}
-    >
-      {weeklyPlantTypes.length > 0 ? (
-        weeklyPlantTypes.map((plantType) => (
-          <span
-            key={plantType}
+          <label
             style={{
-              background: "white",
-              border: "1px solid var(--border)",
-              borderRadius: "999px",
-              padding: "7px 11px",
-              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "9px",
+              cursor: "pointer",
               fontWeight: 600,
+              fontSize: "14px",
             }}
           >
-            🌿 {plantType}
-          </span>
-        ))
-      ) : (
-        <span className="muted">
-          No plant types recorded this week yet.
-        </span>
-      )}
-    </div>
-  )}
-</section>
+            <span>View Plant Types</span>
+
+            <input
+              type="checkbox"
+              checked={showPlantTypes}
+              onChange={(e) =>
+                setShowPlantTypes(e.target.checked)
+              }
+              style={{
+                width: "18px",
+                height: "18px",
+                cursor: "pointer",
+              }}
+            />
+          </label>
+        </div>
+
+        <p className="big-number">
+          {plantCount} / {plantGoal ?? 25}
+        </p>
+
+        <p
+          className="muted"
+          style={{
+            marginBottom: showPlantTypes ? "16px" : 0,
+          }}
+        >
+          different plant types
+        </p>
+
+        {showPlantTypes && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
+            {weeklyPlantTypes.length > 0 ? (
+              weeklyPlantTypes.map((plantType) => (
+                <span
+                  key={plantType}
+                  style={{
+                    background: "white",
+                    border: "1px solid var(--border)",
+                    borderRadius: "999px",
+                    padding: "7px 11px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                  }}
+                >
+                  🌿 {plantType}
+                </span>
+              ))
+            ) : (
+              <span className="muted">
+                No plant types recorded this week yet.
+              </span>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="card">
         <div
           style={{
             display: "flex",
-            justifyContent:
-              "space-between",
+            justifyContent: "space-between",
             alignItems: "center",
             gap: "16px",
             flexWrap: "wrap",
@@ -1343,9 +1179,7 @@ export default function Home() {
         >
           <h2
             className="section-title"
-            style={{
-              marginBottom: 0,
-            }}
+            style={{ marginBottom: 0 }}
           >
             ✨ Add Food
           </h2>
@@ -1360,18 +1194,13 @@ export default function Home() {
               fontSize: "14px",
             }}
           >
-            <span>
-              Add Food Manually
-            </span>
+            <span>Add Food Manually</span>
 
             <input
               type="checkbox"
               checked={manualMode}
               onChange={(e) => {
-                setManualMode(
-                  e.target.checked
-                );
-
+                setManualMode(e.target.checked);
                 setMessage("");
               }}
               style={{
@@ -1386,24 +1215,17 @@ export default function Home() {
         {!manualMode ? (
           <>
             <p className="muted">
-              Tell me what Thea ate
-              in your own words.
-              Nothing is saved until
-              you review it.
+              Tell me what Thea ate in your own words.
+              Nothing is saved until you review it.
             </p>
 
             <textarea
               className="textarea-field"
               value={aiText}
               onChange={(e) => {
-                setAiText(
-                  e.target.value
-                );
-
+                setAiText(e.target.value);
                 setAiPreview([]);
-                setMetadataByIndex(
-                  {}
-                );
+                setMetadataByIndex({});
               }}
               maxLength={1000}
               placeholder="Example: Yesterday Thea had banana and Greek yogurt. She loved the banana."
@@ -1411,9 +1233,7 @@ export default function Home() {
 
             <button
               className="primary-button"
-              onClick={
-                parseAiEntry
-              }
+              onClick={parseAiEntry}
               disabled={parsingAi}
             >
               {parsingAi
@@ -1421,23 +1241,15 @@ export default function Home() {
                 : "Review entry"}
             </button>
 
-            {aiPreview.length >
-              0 && (
-              <div
-                style={{
-                  marginTop:
-                    "24px",
-                }}
-              >
+            {aiPreview.length > 0 && (
+              <div style={{ marginTop: "24px" }}>
                 <h3
                   style={{
                     fontFamily:
                       'Georgia, "Times New Roman", serif',
-                    fontSize:
-                      "22px",
+                    fontSize: "22px",
                     marginTop: 0,
-                    marginBottom:
-                      "14px",
+                    marginBottom: "14px",
                   }}
                 >
                   Review foods
@@ -1445,442 +1257,316 @@ export default function Home() {
 
                 <div
                   style={{
-                    display:
-                      "flex",
-                    flexDirection:
-                      "column",
+                    display: "flex",
+                    flexDirection: "column",
                     gap: "12px",
                   }}
                 >
-                  {aiPreview.map(
-                    (
-                      item,
-                      index
-                    ) => {
-                      const metadata =
-                        metadataByIndex[
-                          index
-                        ];
+                  {aiPreview.map((item, index) => {
+                    const metadata =
+                      metadataByIndex[index];
 
-                      return (
-                        <div
-                          key={`${item.inputName}-${index}`}
-                          style={{
-                            border:
-                              "1px solid var(--border)",
-                            borderRadius:
-                              "14px",
-                            padding:
-                              "14px",
-                            background:
-                              "white",
-                          }}
-                        >
-                          {item.matched ? (
-                            <>
-                              <strong>
-                                {
-                                  item.canonicalName
+                    return (
+                      <div
+                        key={`${item.inputName}-${index}`}
+                        style={{
+                          border:
+                            "1px solid var(--border)",
+                          borderRadius: "14px",
+                          padding: "14px",
+                          background: "white",
+                        }}
+                      >
+                        {item.matched ? (
+                          <>
+                            <strong>
+                              {item.canonicalName}
+                            </strong>
+
+                            {item.preference && (
+                              <p
+                                style={{
+                                  margin: "8px 0 0",
+                                }}
+                              >
+                                Preference:{" "}
+                                <strong>
+                                  {getPreferenceLabel(
+                                    item.preference
+                                  )}
+                                </strong>
+                              </p>
+                            )}
+
+                            <p
+                              className="muted"
+                              style={{
+                                margin: "8px 0 0",
+                              }}
+                            >
+                              Date:{" "}
+                              {formatReviewDate(
+                                item.eatenAt
+                              )}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <strong>
+                              ⚠️ {item.inputName}
+                            </strong>
+
+                            <p
+                              className="muted"
+                              style={{
+                                margin: "8px 0 12px",
+                              }}
+                            >
+                              This food isn&apos;t in
+                              Thea&apos;s food library yet.
+                            </p>
+
+                            {!metadata && (
+                              <button
+                                className="secondary-button"
+                                onClick={() =>
+                                  suggestFoodMetadata(index)
                                 }
-                              </strong>
+                                disabled={
+                                  suggestingIndex === index
+                                }
+                              >
+                                {suggestingIndex === index
+                                  ? "Preparing..."
+                                  : "+ Review & add to food library"}
+                              </button>
+                            )}
 
-                              {item.preference && (
-                                <p
+                            {metadata && (
+                              <div
+                                style={{
+                                  marginTop: "16px",
+                                  paddingTop: "16px",
+                                  borderTop:
+                                    "1px solid var(--border)",
+                                }}
+                              >
+                                <h4
                                   style={{
-                                    margin:
-                                      "8px 0 0",
+                                    margin: "0 0 14px",
+                                    fontSize: "18px",
                                   }}
                                 >
-                                  Preference:{" "}
-                                  <strong>
-                                    {getPreferenceLabel(
-                                      item.preference
+                                  Review food details
+                                </h4>
+
+                                <label className="label">
+                                  Food name
+
+                                  <input
+                                    className="field"
+                                    value={metadata.food_name}
+                                    onChange={(e) =>
+                                      updateMetadata(index, {
+                                        food_name:
+                                          e.target.value,
+                                      })
+                                    }
+                                    style={{
+                                      marginTop: "8px",
+                                      marginBottom: "14px",
+                                    }}
+                                  />
+                                </label>
+
+                                <label className="label">
+                                  Category
+
+                                  <input
+                                    className="field"
+                                    value={metadata.category}
+                                    onChange={(e) =>
+                                      updateMetadata(index, {
+                                        category:
+                                          e.target.value,
+                                      })
+                                    }
+                                    style={{
+                                      marginTop: "8px",
+                                      marginBottom: "14px",
+                                    }}
+                                  />
+                                </label>
+
+                                <label className="label">
+                                  Subcategory
+
+                                  <input
+                                    className="field"
+                                    value={
+                                      metadata.subcategory ?? ""
+                                    }
+                                    onChange={(e) =>
+                                      updateMetadata(index, {
+                                        subcategory:
+                                          e.target.value || null,
+                                      })
+                                    }
+                                    style={{
+                                      marginTop: "8px",
+                                      marginBottom: "14px",
+                                    }}
+                                  />
+                                </label>
+
+                                <label className="label">
+                                  Plant type
+                                  {metadata.plant_types.length > 1
+                                    ? "s"
+                                    : ""}
+
+                                  <input
+                                    className="field"
+                                    value={metadata.plant_types.join(
+                                      ", "
                                     )}
-                                  </strong>
-                                </p>
-                              )}
+                                    onChange={(e) =>
+                                      updateMetadata(index, {
+                                        plant_types:
+                                          e.target.value
+                                            .split(",")
+                                            .map((value) =>
+                                              value.trim()
+                                            )
+                                            .filter(Boolean),
+                                      })
+                                    }
+                                    style={{
+                                      marginTop: "8px",
+                                      marginBottom: "14px",
+                                    }}
+                                  />
+                                </label>
 
-                              <p
-                                className="muted"
-                                style={{
-                                  margin:
-                                    "8px 0 0",
-                                }}
-                              >
-                                Date:{" "}
-                                {formatReviewDate(
-                                  item.eatenAt
-                                )}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <strong>
-                                ⚠️{" "}
-                                {
-                                  item.inputName
-                                }
-                              </strong>
-
-                              <p
-                                className="muted"
-                                style={{
-                                  margin:
-                                    "8px 0 12px",
-                                }}
-                              >
-                                This food
-                                isn&apos;t in
-                                Thea&apos;s food
-                                library yet.
-                              </p>
-
-                              {!metadata && (
-                                <button
-                                  className="secondary-button"
-                                  onClick={() =>
-                                    suggestFoodMetadata(
-                                      index
-                                    )
-                                  }
-                                  disabled={
-                                    suggestingIndex ===
-                                    index
-                                  }
+                                <label
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "9px",
+                                    marginBottom: "16px",
+                                    fontWeight: 600,
+                                  }}
                                 >
-                                  {suggestingIndex ===
-                                  index
-                                    ? "Preparing..."
-                                    : "+ Review & add to food library"}
-                                </button>
-                              )}
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      metadata.is_iron_rich
+                                    }
+                                    onChange={(e) =>
+                                      updateMetadata(index, {
+                                        is_iron_rich:
+                                          e.target.checked,
+                                      })
+                                    }
+                                  />
 
-                              {metadata && (
+                                  Iron-rich food
+                                </label>
+
                                 <div
                                   style={{
-                                    marginTop:
-                                      "16px",
-                                    paddingTop:
-                                      "16px",
-                                    borderTop:
-                                      "1px solid var(--border)",
+                                    marginBottom: "16px",
                                   }}
                                 >
-                                  <h4
-                                    style={{
-                                      margin:
-                                        "0 0 14px",
-                                      fontSize:
-                                        "18px",
-                                    }}
-                                  >
-                                    Review food details
-                                  </h4>
-
-                                  <label className="label">
-                                    Food name
-
-                                    <input
-                                      className="field"
-                                      value={
-                                        metadata.food_name
-                                      }
-                                      onChange={(
-                                        e
-                                      ) =>
-                                        updateMetadata(
-                                          index,
-                                          {
-                                            food_name:
-                                              e
-                                                .target
-                                                .value,
-                                          }
-                                        )
-                                      }
-                                      style={{
-                                        marginTop:
-                                          "8px",
-                                        marginBottom:
-                                          "14px",
-                                      }}
-                                    />
-                                  </label>
-
-                                  <label className="label">
-                                    Category
-
-                                    <input
-                                      className="field"
-                                      value={
-                                        metadata.category
-                                      }
-                                      onChange={(
-                                        e
-                                      ) =>
-                                        updateMetadata(
-                                          index,
-                                          {
-                                            category:
-                                              e
-                                                .target
-                                                .value,
-                                          }
-                                        )
-                                      }
-                                      style={{
-                                        marginTop:
-                                          "8px",
-                                        marginBottom:
-                                          "14px",
-                                      }}
-                                    />
-                                  </label>
-
-                                  <label className="label">
-                                    Subcategory
-
-                                    <input
-                                      className="field"
-                                      value={
-                                        metadata.subcategory ??
-                                        ""
-                                      }
-                                      onChange={(
-                                        e
-                                      ) =>
-                                        updateMetadata(
-                                          index,
-                                          {
-                                            subcategory:
-                                              e
-                                                .target
-                                                .value ||
-                                              null,
-                                          }
-                                        )
-                                      }
-                                      style={{
-                                        marginTop:
-                                          "8px",
-                                        marginBottom:
-                                          "14px",
-                                      }}
-                                    />
-                                  </label>
-
-                                  <label className="label">
-                                    Plant type
-                                    {metadata
-                                      .plant_types
-                                      .length >
-                                    1
-                                      ? "s"
-                                      : ""}
-
-                                    <input
-                                      className="field"
-                                      value={metadata.plant_types.join(
-                                        ", "
-                                      )}
-                                      onChange={(
-                                        e
-                                      ) =>
-                                        updateMetadata(
-                                          index,
-                                          {
-                                            plant_types:
-                                              e.target.value
-                                                .split(
-                                                  ","
-                                                )
-                                                .map(
-                                                  (
-                                                    value
-                                                  ) =>
-                                                    value.trim()
-                                                )
-                                                .filter(
-                                                  Boolean
-                                                ),
-                                          }
-                                        )
-                                      }
-                                      placeholder="Example: Dragon Fruit"
-                                      style={{
-                                        marginTop:
-                                          "8px",
-                                        marginBottom:
-                                          "14px",
-                                      }}
-                                    />
-                                  </label>
-
-                                  <label
-                                    style={{
-                                      display:
-                                        "flex",
-                                      alignItems:
-                                        "center",
-                                      gap: "9px",
-                                      marginBottom:
-                                        "16px",
-                                      fontWeight:
-                                        600,
-                                    }}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={
-                                        metadata.is_iron_rich
-                                      }
-                                      onChange={(
-                                        e
-                                      ) =>
-                                        updateMetadata(
-                                          index,
-                                          {
-                                            is_iron_rich:
-                                              e
-                                                .target
-                                                .checked,
-                                          }
-                                        )
-                                      }
-                                    />
-
-                                    Iron-rich food
-                                  </label>
+                                  <span className="label">
+                                    Allergens
+                                  </span>
 
                                   <div
                                     style={{
-                                      marginBottom:
-                                        "16px",
+                                      display: "flex",
+                                      flexWrap: "wrap",
+                                      gap: "8px 14px",
+                                      marginTop: "8px",
                                     }}
                                   >
-                                    <span className="label">
-                                      Allergens
-                                    </span>
-
-                                    <div
-                                      style={{
-                                        display:
-                                          "flex",
-                                        flexWrap:
-                                          "wrap",
-                                        gap:
-                                          "8px 14px",
-                                        marginTop:
-                                          "8px",
-                                      }}
-                                    >
-                                      {APPROVED_ALLERGENS.map(
-                                        (
-                                          allergen
-                                        ) => (
-                                          <label
-                                            key={
+                                    {APPROVED_ALLERGENS.map(
+                                      (allergen) => (
+                                        <label
+                                          key={allergen}
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            fontSize: "14px",
+                                          }}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={metadata.allergens.includes(
                                               allergen
-                                            }
-                                            style={{
-                                              display:
-                                                "flex",
-                                              alignItems:
-                                                "center",
-                                              gap:
-                                                "6px",
-                                              fontSize:
-                                                "14px",
-                                            }}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={metadata.allergens.includes(
+                                            )}
+                                            onChange={() =>
+                                              toggleMetadataAllergen(
+                                                index,
                                                 allergen
-                                              )}
-                                              onChange={() =>
-                                                toggleMetadataAllergen(
-                                                  index,
-                                                  allergen
-                                                )
-                                              }
-                                            />
-
-                                            {
-                                              allergen
+                                              )
                                             }
-                                          </label>
-                                        )
-                                      )}
-                                    </div>
-                                  </div>
+                                          />
 
-                                  <label className="label">
-                                    Aliases
-
-                                    <input
-                                      className="field"
-                                      value={metadata.aliases.join(
-                                        ", "
-                                      )}
-                                      onChange={(
-                                        e
-                                      ) =>
-                                        updateMetadata(
-                                          index,
-                                          {
-                                            aliases:
-                                              e.target.value
-                                                .split(
-                                                  ","
-                                                )
-                                                .map(
-                                                  (
-                                                    value
-                                                  ) =>
-                                                    value.trim()
-                                                )
-                                                .filter(
-                                                  Boolean
-                                                ),
-                                          }
-                                        )
-                                      }
-                                      placeholder="Separate aliases with commas"
-                                      style={{
-                                        marginTop:
-                                          "8px",
-                                        marginBottom:
-                                          "16px",
-                                      }}
-                                    />
-                                  </label>
-
-                                  <button
-                                    className="primary-button"
-                                    onClick={() =>
-                                      addFoodToLibrary(
-                                        index
+                                          {allergen}
+                                        </label>
                                       )
-                                    }
-                                    disabled={
-                                      addingIndex ===
-                                      index
-                                    }
-                                  >
-                                    {addingIndex ===
-                                    index
-                                      ? "Adding..."
-                                      : "Add to food library"}
-                                  </button>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      );
-                    }
-                  )}
+
+                                <label className="label">
+                                  Aliases
+
+                                  <input
+                                    className="field"
+                                    value={metadata.aliases.join(
+                                      ", "
+                                    )}
+                                    onChange={(e) =>
+                                      updateMetadata(index, {
+                                        aliases:
+                                          e.target.value
+                                            .split(",")
+                                            .map((value) =>
+                                              value.trim()
+                                            )
+                                            .filter(Boolean),
+                                      })
+                                    }
+                                    style={{
+                                      marginTop: "8px",
+                                      marginBottom: "16px",
+                                    }}
+                                  />
+                                </label>
+
+                                <button
+                                  className="primary-button"
+                                  onClick={() =>
+                                    addFoodToLibrary(index)
+                                  }
+                                  disabled={
+                                    addingIndex === index
+                                  }
+                                >
+                                  {addingIndex === index
+                                    ? "Adding..."
+                                    : "Add to food library"}
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div
@@ -1888,20 +1574,16 @@ export default function Home() {
                     display: "flex",
                     gap: "10px",
                     flexWrap: "wrap",
-                    marginTop:
-                      "18px",
+                    marginTop: "18px",
                   }}
                 >
                   <button
                     className="primary-button"
-                    onClick={
-                      saveAiFoods
-                    }
+                    onClick={saveAiFoods}
                     disabled={
                       savingAi ||
                       aiPreview.some(
-                        (item) =>
-                          !item.matched
+                        (item) => !item.matched
                       )
                     }
                   >
@@ -1913,13 +1595,8 @@ export default function Home() {
                   <button
                     className="secondary-button"
                     onClick={() => {
-                      setAiPreview(
-                        []
-                      );
-
-                      setMetadataByIndex(
-                        {}
-                      );
+                      setAiPreview([]);
+                      setMetadataByIndex({});
                     }}
                     disabled={savingAi}
                   >
@@ -1936,35 +1613,23 @@ export default function Home() {
 
               <select
                 className="select-field"
-                value={
-                  selectedFoodId
-                }
+                value={selectedFoodId}
                 onChange={(e) =>
-                  setSelectedFoodId(
-                    e.target.value
-                  )
+                  setSelectedFoodId(e.target.value)
                 }
               >
                 <option value="">
                   Choose a food
                 </option>
 
-                {dropdownFoods.map(
-                  (food) => (
-                    <option
-                      key={
-                        food.id
-                      }
-                      value={
-                        food.id
-                      }
-                    >
-                      {
-                        food.name
-                      }
-                    </option>
-                  )
-                )}
+                {dropdownFoods.map((food) => (
+                  <option
+                    key={food.id}
+                    value={food.id}
+                  >
+                    {food.name}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -1975,9 +1640,7 @@ export default function Home() {
                 className="select-field"
                 value={preference}
                 onChange={(e) =>
-                  setPreference(
-                    e.target.value
-                  )
+                  setPreference(e.target.value)
                 }
               >
                 <option value="">
@@ -2009,9 +1672,7 @@ export default function Home() {
                 className="textarea-field"
                 value={notes}
                 onChange={(e) =>
-                  setNotes(
-                    e.target.value
-                  )
+                  setNotes(e.target.value)
                 }
                 placeholder="Optional notes"
               />
@@ -2019,9 +1680,7 @@ export default function Home() {
 
             <button
               className="primary-button"
-              onClick={
-                saveFoodExposure
-              }
+              onClick={saveFoodExposure}
               disabled={savingFood}
             >
               {savingFood
@@ -2043,17 +1702,136 @@ export default function Home() {
           💡 Meal Ideas
         </h2>
 
-        <p
-          className="muted"
-          style={{
-            marginBottom: 0,
-          }}
-        >
-          At least one safe food,
-          no more than one new food,
-          with repeat exposure
-          encouraged.
+        <p className="muted">
+          Meal ideas based on Thea&apos;s actual food history,
+          including at least one liked or loved food and no more
+          than one new food per meal.
         </p>
+
+        <button
+          className="primary-button"
+          onClick={generateMealIdeas}
+          disabled={loadingMealIdeas}
+        >
+          {loadingMealIdeas
+            ? "Thinking..."
+            : mealIdeas.length > 0
+            ? "✨ Suggest New Meal Ideas"
+            : "✨ Suggest Meal Ideas"}
+        </button>
+
+        {mealIdeasMessage && (
+          <p className="message">
+            {mealIdeasMessage}
+          </p>
+        )}
+
+        {mealIdeas.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+              marginTop: "20px",
+            }}
+          >
+            {mealIdeas.map((meal, index) => (
+              <div
+                key={`${meal.title}-${index}`}
+                style={{
+                  background: "white",
+                  border: "1px solid var(--border)",
+                  borderRadius: "16px",
+                  padding: "16px",
+                }}
+              >
+                <h3
+                  style={{
+                    margin: "0 0 12px",
+                    fontFamily:
+                      'Georgia, "Times New Roman", serif',
+                    fontSize: "21px",
+                  }}
+                >
+                  {meal.title}
+                </h3>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {meal.foods.map((food) => (
+                    <span
+                      key={food}
+                      style={{
+                        background: "var(--card-soft)",
+                        border:
+                          "1px solid var(--border)",
+                        borderRadius: "999px",
+                        padding: "7px 11px",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {food}
+                    </span>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {meal.new_food && (
+                    <span
+                      style={{
+                        background: "var(--accent-soft)",
+                        borderRadius: "999px",
+                        padding: "6px 10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      ✨ New food: {meal.new_food}
+                    </span>
+                  )}
+
+                  {meal.iron_rich && (
+                    <span
+                      style={{
+                        background: "var(--green-soft)",
+                        borderRadius: "999px",
+                        padding: "6px 10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      🫘 Iron-rich
+                    </span>
+                  )}
+                </div>
+
+                <p
+                  className="muted"
+                  style={{
+                    margin: 0,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {meal.why_it_works}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="card soft">
@@ -2062,9 +1840,7 @@ export default function Home() {
         </h2>
 
         <p className="muted">
-          Thea&apos;s iron-rich
-          foods over the past 7
-          days.
+          Thea&apos;s iron-rich foods over the past 7 days.
         </p>
 
         <div
@@ -2077,15 +1853,12 @@ export default function Home() {
         >
           <button
             className={
-              ironView ===
-              "calendar"
+              ironView === "calendar"
                 ? "primary-button"
                 : "secondary-button"
             }
             onClick={() =>
-              setIronView(
-                "calendar"
-              )
+              setIronView("calendar")
             }
           >
             📅 Calendar
@@ -2105,8 +1878,7 @@ export default function Home() {
           </button>
         </div>
 
-        {ironView ===
-          "calendar" && (
+        {ironView === "calendar" && (
           <div
             style={{
               display: "grid",
@@ -2115,151 +1887,109 @@ export default function Home() {
               gap: "10px",
             }}
           >
-            {lastSevenDays.map(
-              (day) => (
-                <div
-                  key={
-                    day.dateString
-                  }
+            {lastSevenDays.map((day) => (
+              <div
+                key={day.dateString}
+                style={{
+                  background: "white",
+                  border:
+                    "1px solid var(--border)",
+                  borderRadius: "14px",
+                  padding: "14px 8px",
+                  textAlign: "center",
+                }}
+              >
+                <strong
                   style={{
-                    background:
-                      "white",
-                    border:
-                      "1px solid var(--border)",
-                    borderRadius:
-                      "14px",
-                    padding:
-                      "14px 8px",
-                    textAlign:
-                      "center",
+                    display: "block",
+                    marginBottom: "4px",
                   }}
                 >
-                  <strong
-                    style={{
-                      display:
-                        "block",
-                      marginBottom:
-                        "4px",
-                    }}
-                  >
-                    {
-                      day.weekday
-                    }
-                  </strong>
+                  {day.weekday}
+                </strong>
 
-                  <span
-                    className="muted"
-                    style={{
-                      display:
-                        "block",
-                      fontSize:
-                        "14px",
-                      marginBottom:
-                        "10px",
-                    }}
-                  >
-                    {
-                      day.dateLabel
-                    }
-                  </span>
+                <span
+                  className="muted"
+                  style={{
+                    display: "block",
+                    fontSize: "14px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  {day.dateLabel}
+                </span>
 
-                  <span
-                    style={{
-                      display:
-                        "block",
-                      fontSize:
-                        "25px",
-                      marginBottom:
-                        "5px",
-                    }}
-                  >
-                    {day.hadIron
-                      ? "✅"
-                      : "—"}
-                  </span>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "25px",
+                    marginBottom: "5px",
+                  }}
+                >
+                  {day.hadIron
+                    ? "✅"
+                    : "—"}
+                </span>
 
-                  <span
-                    className="muted"
-                    style={{
-                      fontSize:
-                        "12px",
-                    }}
-                  >
-                    {day.hadIron
-                      ? "Iron-rich"
-                      : "None"}
-                  </span>
-                </div>
-              )
-            )}
+                <span
+                  className="muted"
+                  style={{
+                    fontSize: "12px",
+                  }}
+                >
+                  {day.hadIron
+                    ? "Iron-rich"
+                    : "None"}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
         {ironView === "list" && (
           <>
-            {ironExposures.length ===
-            0 ? (
+            {ironExposures.length === 0 ? (
               <p
                 className="muted"
-                style={{
-                  marginBottom: 0,
-                }}
+                style={{ marginBottom: 0 }}
               >
-                No iron-rich foods
-                recorded in the past
-                7 days.
+                No iron-rich foods recorded in the past 7 days.
               </p>
             ) : (
               <div
                 style={{
-                  display:
-                    "flex",
-                  flexDirection:
-                    "column",
+                  display: "flex",
+                  flexDirection: "column",
                   gap: "10px",
                 }}
               >
-                {ironExposures.map(
-                  (exposure) => (
-                    <div
-                      key={
-                        exposure.id
-                      }
+                {ironExposures.map((exposure) => (
+                  <div
+                    key={exposure.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "16px",
+                      paddingBottom: "10px",
+                      borderBottom:
+                        "1px solid var(--border)",
+                    }}
+                  >
+                    <strong>
+                      {exposure.foodName}
+                    </strong>
+
+                    <span
+                      className="muted"
                       style={{
-                        display:
-                          "flex",
-                        justifyContent:
-                          "space-between",
-                        alignItems:
-                          "center",
-                        gap:
-                          "16px",
-                        paddingBottom:
-                          "10px",
-                        borderBottom:
-                          "1px solid var(--border)",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      <strong>
-                        {
-                          exposure.foodName
-                        }
-                      </strong>
-
-                      <span
-                        className="muted"
-                        style={{
-                          whiteSpace:
-                            "nowrap",
-                        }}
-                      >
-                        {formatShortDate(
-                          exposure.eatenAt
-                        )}
-                      </span>
-                    </div>
-                  )
-                )}
+                      {formatShortDate(exposure.eatenAt)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </>
@@ -2269,9 +1999,7 @@ export default function Home() {
       <button
         className="secondary-button"
         onClick={signOut}
-        style={{
-          marginTop: "24px",
-        }}
+        style={{ marginTop: "24px" }}
       >
         Sign out
       </button>

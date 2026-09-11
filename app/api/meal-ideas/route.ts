@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 type FoodRow = {
   id: string;
   name: string;
+  category: string | null;
   is_iron_rich: boolean;
 };
 
@@ -46,17 +47,17 @@ export async function POST(request: Request) {
       );
     }
 
-   const supabase = createClient(
-  supabaseUrl,
-  supabaseKey,
-  {
-    global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    },
-  }
-);
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseKey,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      }
+    );
 
     const {
       data: { user },
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
     const { data: foods, error: foodsError } =
       await supabase
         .from("foods")
-        .select("id, name, is_iron_rich")
+        .select("id, name, category, is_iron_rich")
         .order("name");
 
     if (foodsError) {
@@ -166,22 +167,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const previouslyTriedFoods = Array.from(triedFoodIds)
-      .map((id) => foodById.get(id)?.name)
-      .filter(Boolean) as string[];
+    const substantiveFoodRows = foodRows.filter((food) => {
+      const category = (food.category ?? "").toLowerCase();
 
-    const untriedFoods = foodRows
+      return !(
+        category.includes("herb") ||
+        category.includes("spice")
+      );
+    });
+
+    const previouslyTriedFoods = substantiveFoodRows
+      .filter((food) => triedFoodIds.has(food.id))
+      .map((food) => food.name);
+
+    const untriedFoods = substantiveFoodRows
       .filter((food) => !triedFoodIds.has(food.id))
       .map((food) => food.name);
 
-    const ironRichTriedFoods = foodRows
+    const ironRichTriedFoods = substantiveFoodRows
       .filter(
         (food) =>
           food.is_iron_rich && triedFoodIds.has(food.id)
       )
       .map((food) => food.name);
 
-    const ironRichUntriedFoods = foodRows
+    const ironRichUntriedFoods = substantiveFoodRows
       .filter(
         (food) =>
           food.is_iron_rich && !triedFoodIds.has(food.id)
@@ -269,11 +279,16 @@ export async function POST(request: Request) {
                     `Prefer meals that help expose Thea to varied plants and iron-rich foods when practical. ` +
                     `Herbs and spices must NOT be used as one of the main foods in a meal suggestion. ` +
                     `A meal's foods should be substantive foods that make sense together as a practical meal. ` +
-                    `Herbs and spices may be mentioned only as an optional flavoring, and they do not count toward the required number of foods in a meal. ` +
-                    `At least one of the meal ideas MUST include a meat-based food when a meat option is available in the provided food lists. ` +
-                    `Do not invent foods that are not in the provided lists. ` +
-                    `Do not mention portion sizes, choking guidance, preparation instructions, feeding method, or medical advice. ` +
-                    `Keep each meal simple and realistic. ` +
+                    `At least one meal idea MUST include a meat-based food when a meat option is available in the provided food lists. ` +
+                    `Return a MIX of simple and cooked meals. ` +
+                    `For exactly 3 meal ideas, return either 1 cooked + 2 simple OR 2 cooked + 1 simple. ` +
+                    `A simple meal is a practical combination of separate foods served together. ` +
+                    `A cooked meal is a very easy recipe-style combination such as baby pancakes, fritters, meatballs, egg cups, oatmeal mixtures, or similar simple foods. ` +
+                    `Cooked meals should use familiar combinations and minimal ingredients. ` +
+                    `Do not invent elaborate recipes. ` +
+                    `For cooked meals, give one short prep instruction. ` +
+                    `For simple meals, prep must be null. ` +
+                    `Do not mention portion sizes, medical advice, or whether a food is new or repeated. ` +
                     `Return exactly ${requestedCount} meal ideas using the required structured JSON schema.`,
                 },
               ],
@@ -324,13 +339,20 @@ export async function POST(request: Request) {
                         title: {
                           type: "string",
                         },
+                        type: {
+                          type: "string",
+                          enum: ["simple", "cooked"],
+                        },
                         foods: {
                           type: "array",
                           minItems: 2,
-                          maxItems: 4,
+                          maxItems: 5,
                           items: {
                             type: "string",
                           },
+                        },
+                        prep: {
+                          type: ["string", "null"],
                         },
                         why_it_works: {
                           type: "string",
@@ -344,7 +366,9 @@ export async function POST(request: Request) {
                       },
                       required: [
                         "title",
+                        "type",
                         "foods",
+                        "prep",
                         "why_it_works",
                         "new_food",
                         "iron_rich",

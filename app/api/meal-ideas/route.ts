@@ -115,11 +115,18 @@ export async function POST(request: Request) {
         .order("eaten_at", { ascending: false });
 
     if (exposuresError) {
-      return Response.json(
-        { error: "Could not load Thea's food history." },
-        { status: 500 }
-      );
-    }
+  console.error(
+    "Food history error:",
+    exposuresError
+  );
+
+  return Response.json(
+    {
+      error: `Could not load Thea's food history: ${exposuresError.message}`,
+    },
+    { status: 500 }
+  );
+}
 
     const exposureRows =
       (exposures ?? []) as ExposureRow[];

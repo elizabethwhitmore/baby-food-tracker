@@ -46,10 +46,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseKey
-    );
+   const supabase = createClient(
+  supabaseUrl,
+  supabaseKey,
+  {
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  }
+);
 
     const {
       data: { user },

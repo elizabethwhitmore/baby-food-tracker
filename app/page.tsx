@@ -1241,73 +1241,93 @@ export default function Home() {
       </nav>
 
       <section className="card green">
-        <h2 className="section-title">
-          🌱 This Week
-        </h2>
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: "16px",
+      flexWrap: "wrap",
+      marginBottom: "14px",
+    }}
+  >
+    <h2
+      className="section-title"
+      style={{ marginBottom: 0 }}
+    >
+      🌱 This Week
+    </h2>
 
-        <p className="big-number">
-          {plantCount} /{" "}
-          {plantGoal ?? 25}
-        </p>
+    <label
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "9px",
+        cursor: "pointer",
+        fontWeight: 600,
+        fontSize: "14px",
+      }}
+    >
+      <span>View Plant Types</span>
 
-        <p className="muted">
-          different plant types
-        </p>
+      <input
+        type="checkbox"
+        checked={showPlantTypes}
+        onChange={(e) =>
+          setShowPlantTypes(e.target.checked)
+        }
+        style={{
+          width: "18px",
+          height: "18px",
+          cursor: "pointer",
+        }}
+      />
+    </label>
+  </div>
 
-        {plantCount > 0 && (
-          <>
-            <button
-              className="secondary-button"
-              onClick={() =>
-                setShowPlantTypes(
-                  !showPlantTypes
-                )
-              }
-              style={{
-                marginTop: "4px",
-              }}
-            >
-              {showPlantTypes
-                ? "Hide plant types ▴"
-                : "View plant types ▾"}
-            </button>
+  <p className="big-number">
+    {plantCount} / {plantGoal ?? 25}
+  </p>
 
-            {showPlantTypes && (
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "8px",
-                  marginTop: "16px",
-                }}
-              >
-                {weeklyPlantTypes.map(
-                  (plantType) => (
-                    <span
-                      key={plantType}
-                      style={{
-                        background:
-                          "white",
-                        border:
-                          "1px solid var(--border)",
-                        borderRadius:
-                          "999px",
-                        padding:
-                          "7px 11px",
-                        fontSize:
-                          "14px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      🌿 {plantType}
-                    </span>
-                  )
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </section>
+  <p
+    className="muted"
+    style={{ marginBottom: showPlantTypes ? "16px" : 0 }}
+  >
+    different plant types
+  </p>
+
+  {showPlantTypes && (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "8px",
+      }}
+    >
+      {weeklyPlantTypes.length > 0 ? (
+        weeklyPlantTypes.map((plantType) => (
+          <span
+            key={plantType}
+            style={{
+              background: "white",
+              border: "1px solid var(--border)",
+              borderRadius: "999px",
+              padding: "7px 11px",
+              fontSize: "14px",
+              fontWeight: 600,
+            }}
+          >
+            🌿 {plantType}
+          </span>
+        ))
+      ) : (
+        <span className="muted">
+          No plant types recorded this week yet.
+        </span>
+      )}
+    </div>
+  )}
+</section>
 
       <section className="card">
         <div

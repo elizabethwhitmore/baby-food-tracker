@@ -1022,6 +1022,24 @@ const [showPassword, setShowPassword] = useState(false);
                 marginBottom: "18px",
               }}
             />
+            <label
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginTop: "-8px",
+    marginBottom: "16px",
+    fontSize: "14px",
+    cursor: "pointer",
+  }}
+>
+  <input
+    type="checkbox"
+    checked={showPassword}
+    onChange={(e) => setShowPassword(e.target.checked)}
+  />
+  Show password
+</label>
           </label>
 
           <button

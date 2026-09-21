@@ -429,7 +429,31 @@ const [showPassword, setShowPassword] = useState(false);
 
     return days;
   }, [ironExposures]);
+async function sendPasswordReset() {
+  setMessage("");
 
+  if (!email.trim()) {
+    setMessage("Enter your email address first.");
+    return;
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email.trim(),
+    {
+      redirectTo:
+        "https://thea-food-tracker.vercel.app/reset-password",
+    }
+  );
+
+  if (error) {
+    setMessage(error.message);
+    return;
+  }
+
+  setMessage(
+    "Password reset email sent! Check your inbox."
+  );
+}
   async function signIn() {
     setSigningIn(true);
     setMessage("");

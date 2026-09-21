@@ -1011,7 +1011,7 @@ const [showPassword, setShowPassword] = useState(false);
 
             <input
               className="field"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
               onChange={(e) =>

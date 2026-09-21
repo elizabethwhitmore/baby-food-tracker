@@ -1075,7 +1075,22 @@ async function sendPasswordReset() {
               ? "Signing in..."
               : "Sign in"}
           </button>
-
+<button
+  type="button"
+  onClick={sendPasswordReset}
+  style={{
+    display: "block",
+    margin: "14px auto 0",
+    padding: 0,
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    textDecoration: "underline",
+    fontSize: "14px",
+  }}
+>
+  Forgot password?
+</button>
           {message && (
             <p className="message">
               {message}

@@ -72,7 +72,8 @@ const APPROVED_ALLERGENS = [
 
 export default function Home() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+const [password, setPassword] = useState("");
+const [showPassword, setShowPassword] = useState(false);
 
   const [babyId, setBabyId] = useState("");
   const [babyName, setBabyName] = useState("");

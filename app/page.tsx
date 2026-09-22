@@ -384,6 +384,21 @@ const [showPassword, setShowPassword] = useState(false);
       }
 
       if (session) {
+        const { data: membership, error: membershipError } =
+          await supabase
+            .from("household_members")
+            .select("role")
+            .eq("user_id", session.user.id)
+            .limit(1)
+            .maybeSingle();
+
+        if (membershipError) {
+          setMessage(membershipError.message);
+          setLoading(false);
+          return;
+        }
+
+        setIsGuest(membership?.role === "guest");
         setSignedIn(true);
 
         await loadBabyData();
@@ -499,6 +514,7 @@ async function sendPasswordReset() {
       return;
     }
 
+    setIsGuest(false);
     setSignedIn(true);
 
     await loadBabyData();
@@ -986,6 +1002,7 @@ async function sendPasswordReset() {
     await supabase.auth.signOut();
 
     setSignedIn(false);
+    setIsGuest(false);
     setBabyId("");
     setBabyName("");
 
@@ -1267,6 +1284,7 @@ async function sendPasswordReset() {
         )}
       </section>
 
+      {!isGuest && (
       <section className="card">
         <div
           style={{
@@ -1826,6 +1844,9 @@ async function sendPasswordReset() {
         )}
       </section>
 
+      )}
+
+      {!isGuest && (
       <section className="card soft">
         <h2 className="section-title">
           💡 Meal Ideas
@@ -1962,6 +1983,8 @@ async function sendPasswordReset() {
           </div>
         )}
       </section>
+
+      )}
 
       <section className="card soft">
         <h2 className="section-title">

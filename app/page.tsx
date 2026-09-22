@@ -1120,6 +1120,17 @@ async function sendPasswordReset() {
 >
   Forgot password?
 </button>
+          <button
+  type="button"
+  className="secondary-button"
+  onClick={continueAsGuest}
+  style={{
+    width: "100%",
+    marginTop: "18px",
+  }}
+>
+  Continue as Guest
+</button>
           {message && (
             <p className="message">
               {message}

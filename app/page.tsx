@@ -118,6 +118,7 @@ const [showPassword, setShowPassword] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [savingFood, setSavingFood] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const [message, setMessage] = useState("");
 
   function getLocalDateString(date: Date) {

@@ -91,6 +91,37 @@ export async function POST(request: Request) {
       );
     }
 
+    const { data: membership, error: membershipError } =
+      await supabase
+        .from("household_members")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "member")
+        .limit(1)
+        .maybeSingle();
+
+    if (membershipError) {
+      console.error(
+        "Meal ideas membership check error:",
+        membershipError
+      );
+
+      return Response.json(
+        { error: "Could not verify your household access." },
+        { status: 500 }
+      );
+    }
+
+    if (!membership) {
+      return Response.json(
+        {
+          error:
+            "Meal ideas are only available to full household members.",
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await request
       .json()
       .catch(() => ({}));

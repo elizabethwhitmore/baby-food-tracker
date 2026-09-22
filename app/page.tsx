@@ -455,6 +455,34 @@ async function sendPasswordReset() {
     "Password reset email sent! Check your inbox."
   );
 }
+  async function continueAsGuest() {
+  setMessage("");
+
+  const { data, error } =
+    await supabase.auth.signInAnonymously();
+
+  if (error || !data.user) {
+    setMessage(
+      error?.message ?? "Could not start guest access."
+    );
+    return;
+  }
+
+  const { error: guestError } =
+    await supabase.rpc("join_as_guest");
+
+  if (guestError) {
+    await supabase.auth.signOut();
+    setMessage(guestError.message);
+    return;
+  }
+
+  setIsGuest(true);
+  setSignedIn(true);
+
+  await loadBabyData();
+  await loadFoodsAndAliases();
+}
   async function signIn() {
     setSigningIn(true);
     setMessage("");

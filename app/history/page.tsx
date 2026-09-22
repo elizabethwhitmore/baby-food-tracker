@@ -72,6 +72,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>("history");
   const [dateRange, setDateRange] = useState<DateRange>("all");
@@ -80,6 +81,33 @@ export default function HistoryPage() {
     async function loadHistory() {
       setLoading(true);
       setMessage("");
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        setMessage("Your sign-in session could not be found.");
+        setLoading(false);
+        return;
+      }
+
+      const { data: membership, error: membershipError } =
+        await supabase
+          .from("household_members")
+          .select("role")
+          .eq("user_id", session.user.id)
+          .limit(1)
+          .maybeSingle();
+
+      if (membershipError) {
+        setMessage(membershipError.message);
+        setLoading(false);
+        return;
+      }
+
+      setIsGuest(membership?.role === "guest");
 
       const { data: exposureData, error: exposureError } = await supabase
         .from("food_exposures")
@@ -334,6 +362,7 @@ export default function HistoryPage() {
                 key={exposure.id}
                 style={{ position: "relative" }}
               >
+                {!isGuest && (
                 <button
                   onClick={() => deleteExposure(exposure)}
                   disabled={deletingId === exposure.id}
@@ -359,6 +388,7 @@ export default function HistoryPage() {
                 >
                   🗑️
                 </button>
+                )}
 
                 <h2
                   className="section-title"

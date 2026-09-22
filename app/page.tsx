@@ -1192,7 +1192,7 @@ async function sendPasswordReset() {
               fontWeight: 600,
             }}
           >
-            👀 Guest · Read only
+            Guest · Read only
           </span>
         </div>
       )}

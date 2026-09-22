@@ -1170,6 +1170,33 @@ async function sendPasswordReset() {
         and allergens.
       </p>
 
+      {isGuest && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginTop: "-4px",
+            marginBottom: "18px",
+          }}
+        >
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: "999px",
+              background: "var(--card-soft)",
+              fontSize: "13px",
+              fontWeight: 600,
+            }}
+          >
+            👀 Guest · Read only
+          </span>
+        </div>
+      )}
+
       <nav className="nav-card">
         <a
           href="/"
@@ -2153,7 +2180,7 @@ async function sendPasswordReset() {
         onClick={signOut}
         style={{ marginTop: "24px" }}
       >
-        Sign out
+        {isGuest ? "Exit Guest View" : "Sign out"}
       </button>
     </main>
   );

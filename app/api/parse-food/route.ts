@@ -42,7 +42,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    });
 
     const {
       data: { user },
@@ -53,6 +59,37 @@ export async function POST(request: Request) {
       return Response.json(
         { error: "Your sign-in session is not valid." },
         { status: 401 }
+      );
+    }
+
+    const { data: membership, error: membershipError } =
+      await supabase
+        .from("household_members")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "member")
+        .limit(1)
+        .maybeSingle();
+
+    if (membershipError) {
+      console.error(
+        "Parse food membership check error:",
+        membershipError
+      );
+
+      return Response.json(
+        { error: "Could not verify your household access." },
+        { status: 500 }
+      );
+    }
+
+    if (!membership) {
+      return Response.json(
+        {
+          error:
+            "Food entry tools are only available to full household members.",
+        },
+        { status: 403 }
       );
     }
 

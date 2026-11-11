@@ -182,6 +182,7 @@ export default function HistoryPage() {
         <a className="nav-link" href="/">🏠 Home</a>
         <a className="nav-link active" href="/history">📖 History</a>
         <a className="nav-link" href="/allergens">🥜 Allergens</a>
+        <a href="/recipes" className="nav-link">🍽️ Recipes</a>
       </nav>
       {message && <p className="message" role="alert">{message}</p>}
       {loading ? <section className="card"><p>Loading food history...</p></section> : (

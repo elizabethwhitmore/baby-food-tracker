@@ -9,6 +9,7 @@ type Food = {
   show_in_dropdown: boolean;
 };
 
+type SavedRecipe = { id: string; name: string };
 type Alias = {
   alias: string;
   food_id: string;
@@ -88,6 +89,9 @@ const [showPassword, setShowPassword] = useState(false);
 
   const [foods, setFoods] = useState<Food[]>([]);
   const [aliases, setAliases] = useState<Alias[]>([]);
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  const [foodSearch, setFoodSearch] = useState("");
+  const [selectedRecipeId, setSelectedRecipeId] = useState("");
 
   const [manualMode, setManualMode] = useState(false);
 
@@ -368,6 +372,9 @@ const [showPassword, setShowPassword] = useState(false);
 
     setFoods((foodData ?? []) as Food[]);
     setAliases((aliasData ?? []) as Alias[]);
+    const { data: recipesData, error: recipesError } = await supabase.from("recipes").select("id, name").order("name");
+    if (recipesError) setMessage(recipesError.message);
+    else setSavedRecipes((recipesData ?? []) as SavedRecipe[]);
   }
 
   useEffect(() => {
@@ -412,8 +419,13 @@ const [showPassword, setShowPassword] = useState(false);
   }, []);
 
   const dropdownFoods = useMemo(() => {
-    return foods.filter((food) => food.show_in_dropdown);
-  }, [foods]);
+    const term = foodSearch.toLowerCase().trim();
+    return foods.filter(f => f.show_in_dropdown && (!term || f.name.toLowerCase().includes(term) ||
+      aliases.some(a => a.food_id === f.id && a.alias.toLowerCase().includes(term))));
+  }, [foods, aliases, foodSearch]);
+  const dropdownRecipes = useMemo(() =>
+    savedRecipes.filter(r => r.name.toLowerCase().includes(foodSearch.toLowerCase().trim())),
+    [savedRecipes, foodSearch]);
 
   const lastSevenDays = useMemo(() => {
     const days = [];
@@ -526,8 +538,8 @@ async function sendPasswordReset() {
   async function saveFoodExposure() {
     setMessage("");
 
-    if (!selectedFoodId) {
-      setMessage("Please choose a food.");
+    if (!selectedFoodId && !selectedRecipeId) {
+      setMessage("Please choose a food or recipe.");
       return;
     }
 
@@ -544,10 +556,15 @@ async function sendPasswordReset() {
       return;
     }
 
-    const { error } =
-      await supabase
-        .from("food_exposures")
-        .insert({
+    const { error } = selectedRecipeId
+      ? await supabase.rpc("log_recipe", {
+          p_recipe_id: selectedRecipeId,
+          p_baby_id: babyId,
+          p_eaten_at: getLocalDateString(new Date()),
+          p_preference: preference || null,
+          p_notes: notes || null,
+        })
+      : await supabase.from("food_exposures").insert({
           baby_id: babyId,
           food_id: selectedFoodId,
           preference: preference || null,
@@ -562,13 +579,15 @@ async function sendPasswordReset() {
     }
 
     setSelectedFoodId("");
+    setSelectedRecipeId("");
+    setFoodSearch("");
     setPreference("");
     setNotes("");
 
     await loadPlantCount(babyId);
     await loadIronExposures(babyId);
 
-    setMessage("Food saved! ✓");
+    setMessage(selectedRecipeId ? "Recipe ingredients saved! ✓" : "Food saved! ✓");
     setSavingFood(false);
   }
 
@@ -1218,6 +1237,7 @@ async function sendPasswordReset() {
         >
           🥜 Allergens
         </a>
+        <a href="/recipes" className="nav-link">🍽️ Recipes</a>
       </nav>
 
       <section className="card green">
@@ -1782,30 +1802,30 @@ async function sendPasswordReset() {
           </>
         ) : (
           <>
-            <label className="label">
-              Food
-
-              <select
-                className="select-field"
-                value={selectedFoodId}
-                onChange={(e) =>
-                  setSelectedFoodId(e.target.value)
-                }
-              >
-                <option value="">
-                  Choose a food
-                </option>
-
-                {dropdownFoods.map((food) => (
-                  <option
-                    key={food.id}
-                    value={food.id}
-                  >
-                    {food.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <label className="label" htmlFor="food-recipe-search">Search foods or saved recipes</label>
+            <input id="food-recipe-search" className="field" placeholder="Search food or recipes"
+              value={foodSearch} onChange={e => setFoodSearch(e.target.value)} />
+            <label className="label" htmlFor="food-recipe-choice" style={{marginTop:12}}>Choose food or recipe</label>
+            <select id="food-recipe-choice" className="select-field"
+              value={selectedRecipeId ? "recipe:" + selectedRecipeId : selectedFoodId ? "food:" + selectedFoodId : ""}
+              onChange={e => {
+                const v = e.target.value;
+                setSelectedFoodId(v.startsWith("food:") ? v.slice(5) : "");
+                setSelectedRecipeId(v.startsWith("recipe:") ? v.slice(7) : "");
+              }}>
+              <option value="">Choose a food or recipe</option>
+              {selectedFoodId && !dropdownFoods.some(f => f.id === selectedFoodId) &&
+                <option value={"food:" + selectedFoodId}>{foods.find(f => f.id === selectedFoodId)?.name ?? "Selected food"}</option>}
+              {selectedRecipeId && !dropdownRecipes.some(r => r.id === selectedRecipeId) &&
+                <option value={"recipe:" + selectedRecipeId}>{savedRecipes.find(r => r.id === selectedRecipeId)?.name ?? "Selected recipe"}</option>}
+              <optgroup label="Saved recipes">
+                {dropdownRecipes.map(r => <option key={r.id} value={"recipe:" + r.id}>🍽️ {r.name}</option>)}
+              </optgroup>
+              <optgroup label="Individual foods">
+                {dropdownFoods.map(f => <option key={f.id} value={"food:" + f.id}>{f.name}</option>)}
+              </optgroup>
+            </select>
+            {selectedRecipeId && <p className="muted">Every distinct recipe ingredient will be logged separately. <a href="/recipes">Edit recipes</a>.</p>}
 
             <label className="label">
               Preference
@@ -1859,7 +1879,7 @@ async function sendPasswordReset() {
             >
               {savingFood
                 ? "Saving..."
-                : "Save food"}
+                : selectedRecipeId ? "Log recipe ingredients" : "Save food"}
             </button>
           </>
         )}

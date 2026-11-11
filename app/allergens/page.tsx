@@ -162,6 +162,7 @@ export default function AllergensPage() {
         <a href="/allergens" className="nav-link active">
           🥜 Allergens
         </a>
+        <a href="/recipes" className="nav-link">🍽️ Recipes</a>
       </nav>
 
       {message && <p className="message">{message}</p>}

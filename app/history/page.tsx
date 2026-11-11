@@ -12,21 +12,10 @@ type Exposure = {
   notes: string | null;
   recorded_by: string | null;
 };
-
-type Food = {
-  id: string;
-  name: string;
-  category: string | null;
-};
-
-type HouseholdMember = {
-  user_id: string;
-  display_name: string | null;
-};
-
+type Food = { id: string; name: string; category: string | null };
+type HouseholdMember = { user_id: string; display_name: string | null };
 type DateRange = "all" | "7" | "30";
 type ViewMode = "history" | "foods";
-
 type FoodSummary = {
   id: string;
   name: string;
@@ -94,3 +83,14 @@ export default function HistoryPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("foods");
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [search, setSearch] = useState("");
+  const [expandedFoodId, setExpandedFoodId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadHistory() {
+      setLoading(true);
+      setMessage("");
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        setMessage("Please sign in to view food history.");
+        setLoading(false);

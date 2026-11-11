@@ -1803,29 +1803,90 @@ async function sendPasswordReset() {
         ) : (
           <>
             <label className="label" htmlFor="food-recipe-search">Search foods or saved recipes</label>
-            <input id="food-recipe-search" className="field" placeholder="Search food or recipes"
-              value={foodSearch} onChange={e => setFoodSearch(e.target.value)} />
-            <label className="label" htmlFor="food-recipe-choice" style={{marginTop:12}}>Choose food or recipe</label>
-            <select id="food-recipe-choice" className="select-field"
-              value={selectedRecipeId ? "recipe:" + selectedRecipeId : selectedFoodId ? "food:" + selectedFoodId : ""}
+            <input
+              id="food-recipe-search"
+              className="field"
+              placeholder="Type a food or recipe name"
+              value={foodSearch}
               onChange={e => {
-                const v = e.target.value;
-                setSelectedFoodId(v.startsWith("food:") ? v.slice(5) : "");
-                setSelectedRecipeId(v.startsWith("recipe:") ? v.slice(7) : "");
-              }}>
-              <option value="">Choose a food or recipe</option>
-              {selectedFoodId && !dropdownFoods.some(f => f.id === selectedFoodId) &&
-                <option value={"food:" + selectedFoodId}>{foods.find(f => f.id === selectedFoodId)?.name ?? "Selected food"}</option>}
-              {selectedRecipeId && !dropdownRecipes.some(r => r.id === selectedRecipeId) &&
-                <option value={"recipe:" + selectedRecipeId}>{savedRecipes.find(r => r.id === selectedRecipeId)?.name ?? "Selected recipe"}</option>}
-              <optgroup label="Saved recipes">
-                {dropdownRecipes.map(r => <option key={r.id} value={"recipe:" + r.id}>🍽️ {r.name}</option>)}
-              </optgroup>
-              <optgroup label="Individual foods">
-                {dropdownFoods.map(f => <option key={f.id} value={"food:" + f.id}>{f.name}</option>)}
-              </optgroup>
-            </select>
-            {selectedRecipeId && <p className="muted">Every distinct recipe ingredient will be logged separately. <a href="/recipes">Edit recipes</a>.</p>}
+                setFoodSearch(e.target.value);
+                setSelectedFoodId("");
+                setSelectedRecipeId("");
+              }}
+              onKeyDown={e => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                const recipe = dropdownRecipes[0];
+                const food = dropdownFoods[0];
+                if (recipe) {
+                  setSelectedRecipeId(recipe.id);
+                  setSelectedFoodId("");
+                  setFoodSearch(recipe.name);
+                } else if (food) {
+                  setSelectedFoodId(food.id);
+                  setSelectedRecipeId("");
+                  setFoodSearch(food.name);
+                } else {
+                  setMessage("No matching foods or recipes found.");
+                }
+              }}
+            />
+            {foodSearch.trim() && !selectedRecipeId && !selectedFoodId && (
+              <div style={{ marginTop: 10 }}>
+                <p className="muted">Select a result, or press Enter to select the first match. Nothing is logged until you save.</p>
+                {dropdownRecipes.length === 0 && dropdownFoods.length === 0 && (
+                  <p role="status" className="muted">No matching foods or recipes.</p>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 270, overflowY: "auto" }}>
+                  {dropdownRecipes.slice(0, 12).map(recipe => (
+                    <button
+                      key={"recipe-" + recipe.id}
+                      type="button"
+                      className="secondary-button"
+                      style={{ textAlign: "left" }}
+                      onClick={() => {
+                        setSelectedRecipeId(recipe.id);
+                        setSelectedFoodId("");
+                        setFoodSearch(recipe.name);
+                      }}
+                    >🍽️ Recipe: {recipe.name}</button>
+                  ))}
+                  {dropdownFoods.slice(0, 25).map(food => (
+                    <button
+                      key={"food-" + food.id}
+                      type="button"
+                      className="secondary-button"
+                      style={{ textAlign: "left" }}
+                      onClick={() => {
+                        setSelectedFoodId(food.id);
+                        setSelectedRecipeId("");
+                        setFoodSearch(food.name);
+                      }}
+                    >🥕 Food: {food.name}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(selectedRecipeId || selectedFoodId) && (
+              <p role="status" className="muted">
+                Selected: {selectedRecipeId
+                  ? "🍽️ Recipe: " + (savedRecipes.find(recipe => recipe.id === selectedRecipeId)?.name ?? "")
+                  : "🥕 Food: " + (foods.find(food => food.id === selectedFoodId)?.name ?? "")}
+                {" · "}
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    setSelectedRecipeId("");
+                    setSelectedFoodId("");
+                    setFoodSearch("");
+                  }}
+                >Clear</button>
+              </p>
+            )}
+            {selectedRecipeId && (
+              <p className="muted">Each distinct ingredient will be logged separately when you confirm below. <a href="/recipes">Edit recipes</a>.</p>
+            )}
 
             <label className="label">
               Preference

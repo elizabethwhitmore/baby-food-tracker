@@ -18,6 +18,7 @@ export default function RecipesPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [saveFeedback, setSaveFeedback] = useState("");
   const [guest, setGuest] = useState(true);
   const [householdId, setHouseholdId] = useState("");
   const [babyId, setBabyId] = useState("");
@@ -113,27 +114,43 @@ export default function RecipesPage() {
   }
 
   async function saveRecipe() {
-    if (guest || !householdId) return;
-    if (!name.trim() || chosen.length === 0) {
-      setMessage("Enter a recipe name and select at least one ingredient.");
+    setSaveFeedback("");
+    setMessage("");
+    if (busy) return;
+    if (guest) {
+      setSaveFeedback("Guests cannot save recipes. Sign in with a household member account.");
+      return;
+    }
+    if (!householdId) {
+      setSaveFeedback("Your household has not loaded. Refresh the page and sign in again.");
+      return;
+    }
+    if (!name.trim()) {
+      setSaveFeedback("Enter a recipe name before saving.");
+      return;
+    }
+    if (chosen.length === 0) {
+      setSaveFeedback("Select at least one ingredient using the + buttons below the search box.");
       return;
     }
     setBusy(true);
-    setMessage("");
+    setSaveFeedback("Saving recipe...");
     try {
-      const { error } = await supabase.rpc("save_recipe", {
+      const { data, error } = await supabase.rpc("save_recipe", {
         p_household_id: householdId,
         p_recipe_id: editingId,
         p_name: name.trim(),
-        p_description: description.trim() || null,
+        p_description: description.trim() || "",
         p_food_ids: [...new Set(chosen)],
       });
       if (error) throw error;
+      if (!data) throw new Error("The database did not return a recipe ID.");
       await refreshRecipes(householdId);
       resetEditor();
-      setMessage("Recipe saved.");
+      setSaveFeedback("Recipe saved! Find it under Saved Recipes below.");
     } catch (error) {
-      setMessage(`Could not save recipe: ${error instanceof Error ? error.message : String(error)}. Review ingredients before retrying.`);
+      const detail = error instanceof Error ? error.message : String(error);
+      setSaveFeedback(`Could not save recipe: ${detail}`);
     } finally {
       setBusy(false);
     }
@@ -207,9 +224,14 @@ export default function RecipesPage() {
                 {availableFoods.length === 0 && <p className="muted">No matching food in the visible catalog.</p>}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                <button className="primary-button" disabled={busy} onClick={() => void saveRecipe()}>{busy ? "Saving..." : editingId ? "Save Changes" : "Save Recipe"}</button>
+                <button type="button" className="primary-button" disabled={busy} onClick={() => void saveRecipe()}>{busy ? "Saving..." : editingId ? "Save Changes" : "Save Recipe"}</button>
                 {editingId && <button className="secondary-button" onClick={resetEditor}>Cancel</button>}
               </div>
+              {saveFeedback && (
+                <p role="status" aria-live="polite" className="message" style={{ marginTop: 14 }}>
+                  {saveFeedback}
+                </p>
+              )}
             </section>
           )}
           <section className="card">

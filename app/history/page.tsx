@@ -1,3 +1,131 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../../lib/supabase";
+
+type Exposure = {
+  id: string;
+  food_id: string;
+  eaten_at: string;
+  created_at: string;
+  preference: string | null;
+  notes: string | null;
+  recorded_by: string | null;
+};
+type Food = { id: string; name: string; category: string | null };
+type Member = { user_id: string; display_name: string | null };
+type Range = "all" | "7" | "30";
+type View = "foods" | "history";
+type Summary = {
+  id: string;
+  name: string;
+  category: string;
+  count: number;
+  first: string;
+  last: string;
+  preference: string | null;
+};
+
+const categories = [
+  "Vegetables", "Fruits", "Grains", "Proteins", "Legumes", "Dairy",
+  "Dairy Alternatives", "Nuts & Seeds", "Herbs & Spices", "Other",
+];
+
+function categoryLabel(value: string | null): string {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "vegetable": case "vegetables": return "Vegetables";
+    case "fruit": case "fruits": return "Fruits";
+    case "grain": case "grains": return "Grains";
+    case "protein": case "proteins": return "Proteins";
+    case "legume": case "legumes": return "Legumes";
+    case "dairy": return "Dairy";
+    case "dairy alternative": case "dairy alternatives": return "Dairy Alternatives";
+    case "nut/seed": case "nuts/seeds": case "nuts & seeds": return "Nuts & Seeds";
+    case "herb/spice": case "herb or spice": case "herbs & spices": return "Herbs & Spices";
+    default: return "Other";
+  }
+}
+function formatDate(value: string): string {
+  if (!value) return "Unknown";
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
+function preferenceLabel(value: string | null): string {
+  switch (value) {
+    case "loved": return "Loved ❤️";
+    case "liked": return "Liked 🙂";
+    case "neutral": return "Neutral 😐";
+    case "disliked": return "Didn't like 🙅‍♀️";
+    default: return "Not rated";
+  }
+}
+function inRange(value: string, range: Range): boolean {
+  if (range === "all") return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cutoff = new Date(today);
+  cutoff.setDate(today.getDate() - (range === "7" ? 6 : 29));
+  const when = new Date(`${value}T00:00:00`);
+  return when >= cutoff && when <= today;
+}
+
+export default function HistoryPage() {
+  const [exposures, setExposures] = useState<Exposure[]>([]);
+  const [foods, setFoods] = useState<Food[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [isGuest, setIsGuest] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [view, setView] = useState<View>("foods");
+  const [range, setRange] = useState<Range>("all");
+  const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        setMessage("Please sign in on the Home page to see food history.");
+        setLoading(false);
+        return;
+      }
+      const { data: membership, error: membershipError } = await supabase
+        .from("household_members")
+        .select("role")
+        .eq("user_id", session.user.id)
+        .limit(1)
+        .maybeSingle();
+      if (membershipError) {
+        setMessage(membershipError.message);
+        setLoading(false);
+        return;
+      }
+      setIsGuest(membership?.role === "guest");
+
+      const [exposureResult, foodResult, memberResult] = await Promise.all([
+        supabase.from("food_exposures")
+          .select("id, food_id, eaten_at, created_at, preference, notes, recorded_by")
+          .order("eaten_at", { ascending: false })
+          .order("created_at", { ascending: false }),
+        supabase.from("foods").select("id, name, category").order("name"),
+        supabase.from("household_members").select("user_id, display_name"),
+      ]);
+      const error = exposureResult.error ?? foodResult.error ?? memberResult.error;
+      if (error) {
+        setMessage(error.message);
+      } else {
+        setExposures((exposureResult.data ?? []) as Exposure[]);
+        setFoods((foodResult.data ?? []) as Food[]);
+        setMembers((memberResult.data ?? []) as Member[]);
+      }
+      setLoading(false);
+    }
+    void load();
+  }, []);
+
   const foodMap = useMemo(() => new Map(foods.map(f => [f.id, f])), [foods]);
   const memberMap = useMemo(() => new Map(members.map(m => [m.user_id, m.display_name ?? "Unknown"])), [members]);
   const filtered = useMemo(() => exposures.filter(e => inRange(e.eaten_at, range)), [exposures, range]);
@@ -126,3 +254,4 @@
       )}
     </main>
   );
+}
